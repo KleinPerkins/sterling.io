@@ -37,4 +37,4 @@ This repository is born under doc-warden v2 governance.
 
 ## Documentation authority
 
-Use the global doc-warden skill and repository v2 profile for semantic/structural mutations. Its exact preview/consent contract applies. Preserve prior accepted input and evidence during adoption; do not infer new PRD/design/phase acceptance from repository creation. The generated bootstrap roadmap is not a replacement for the approved S0–S4 plan and expansion scope.
+Use the global doc-warden skill and repository v2 profile for semantic/structural mutations. Its exact preview/consent contract applies. Preserve prior accepted input and evidence during adoption; do not infer new PRD/design/phase acceptance from repository creation. The projected roadmap retains the S0–S4 sequence and expansion scope. Canonical PRD intake remains draft until its explicit acceptance; original requirement identifiers remain preserved alongside tooling aliases.
