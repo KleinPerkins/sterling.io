@@ -98,4 +98,18 @@ class AutoMergeTests(unittest.TestCase):
         self.assertFalse(merge.eligible(self.pr,self.run,[]))
         self.run['conclusion']='failure';self.assertFalse(merge.eligible(self.pr,self.run,['README.md']))
 
+class TestReportingTests(unittest.TestCase):
+    def test_older_toolchain_without_final_suite_count(self):
+        reporting=module('test_reporting','test_reporting.py')
+        log="Suite UpdateConfigurationTests passed after 0.1 seconds.\nSuite InteractionTests passed after 0.1 seconds.\nSuite SimulationTests passed after 0.2 seconds.\nTest run with 21 tests passed after 0.2 seconds."
+        self.assertEqual(reporting.parse_summary(log),(21,3))
+    def test_newer_toolchain_separate_target_summaries(self):
+        reporting=module('test_reporting','test_reporting.py')
+        log="Test run with 4 tests in 1 suite passed after 0.1 seconds.\nTest run with 17 tests in 2 suites passed after 0.2 seconds."
+        self.assertEqual(reporting.parse_summary(log),(21,3))
+    def test_empty_failed_or_zero_test_runs_are_rejected(self):
+        reporting=module('test_reporting','test_reporting.py')
+        for log in ('','Test run with 21 tests failed.','Test run with 0 tests in 0 suites passed.'):
+            with self.subTest(log=log),self.assertRaises(ValueError):reporting.parse_summary(log)
+
 if __name__=='__main__':unittest.main()
