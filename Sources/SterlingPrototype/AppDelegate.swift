@@ -16,6 +16,7 @@ import SterlingCore
   let runtime = SimulationRuntime()
   var snapshot = Simulation().snapshot
   var statusItem: NSStatusItem!
+  var appUpdater: AppUpdater?
   var pauseItem: NSMenuItem?
   var focusItem: NSMenuItem?
   var motionItem: NSMenuItem?
@@ -42,6 +43,7 @@ import SterlingCore
   func applicationDidFinishLaunching(_ notification: Notification) {
     do {
       try makeOverlay()
+      appUpdater = AppUpdater(isProbe: isProbe)
       makeMenu()
       observeEnvironment()
       startTimer()
@@ -104,6 +106,7 @@ import SterlingCore
       title: "Feasibility preview · temporary artwork", action: nil, keyEquivalent: "")
     label.isEnabled = false
     menu.addItem(label)
+    appUpdater?.addMenuItems(to: menu)
     item("Quit Sterling", #selector(quit), "q")
     statusItem.menu = menu
   }

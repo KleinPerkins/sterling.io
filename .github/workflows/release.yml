@@ -1,0 +1,57 @@
+name: Signed macOS release
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing sterling-vX.Y.Z tag to build or retry
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: sterling-release
+  cancel-in-progress: false
+jobs:
+  release:
+    # Environment requires owner approval; manual dispatch must use main.
+    if: github.ref == 'refs/heads/main' && github.repository == 'KleinPerkins/sterling.io'
+    environment: release
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate release tag and check out approved source
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 Scripts/release.py prepare
+      - name: Verify source, tests and local bundle
+        run: make verify
+      - name: Sign, notarize and package universal app
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+        run: python3 Scripts/release.py package
+      - name: Publish verified assets and check the live updater
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ vars.SPARKLE_PUBLIC_ED_KEY }}
+        run: python3 Scripts/release.py publish

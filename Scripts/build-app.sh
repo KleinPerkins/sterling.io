@@ -4,36 +4,7 @@ cd "${0:A:h:h}"
 mkdir -p work outputs
 Scripts/swift.sh build -c release --product SterlingPrototype > work/release-build.log 2>&1 || { tail -n 60 work/release-build.log; exit 1; }
 products=$(Scripts/swift.sh build -c release --show-bin-path)
-staging="$products/Sterling Feasibility.app"
-mkdir -p "$staging/Contents/MacOS" "$staging/Contents/Resources"
-cp "$products/SterlingPrototype" "$staging/Contents/MacOS/SterlingPrototype"
-chmod +x "$staging/Contents/MacOS/SterlingPrototype"
-python3 - "$staging" <<'PY'
-from pathlib import Path
-import plistlib, sys
-info={
-    'CFBundleName':'Sterling Feasibility',
-    'CFBundleDisplayName':'Sterling Feasibility',
-    'CFBundleIdentifier':'io.sterling.feasibility',
-    'CFBundleExecutable':'SterlingPrototype',
-    'CFBundlePackageType':'APPL',
-    'CFBundleShortVersionString':'0.0.1',
-    'CFBundleVersion':'1',
-    'LSMinimumSystemVersion':'15.0',
-    'LSUIElement':True,
-    'NSHighResolutionCapable':True,
-    'NSPrincipalClass':'NSApplication',
-}
-with (Path(sys.argv[1])/'Contents/Info.plist').open('wb') as f: plistlib.dump(info,f)
-PY
-codesign --force --sign - --options runtime "$staging"
-codesign --verify --strict "$staging"
-ditto --norsrc --noextattr "$staging" "outputs/Sterling Feasibility.app"
-# Only remove generated bundle Finder metadata if File Provider adds it on copy.
-if xattr "outputs/Sterling Feasibility.app" | rg -q '^com.apple.FinderInfo$'; then
-    xattr -d com.apple.FinderInfo "outputs/Sterling Feasibility.app"
-fi
-codesign --verify --strict "outputs/Sterling Feasibility.app"
+python3 Scripts/bundle-app.py "$products"
 codesign -d --verbose=4 "outputs/Sterling Feasibility.app" 2> work/signing-receipt.txt
 python3 - <<'PY'
 from pathlib import Path

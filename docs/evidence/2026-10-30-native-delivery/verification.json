@@ -1,0 +1,33 @@
+{
+  "checked_at": "2026-10-30T08:11:22.710211+00:00",
+  "base_revision": "9f46eb8f60553702e221d93ba2e34cdbcbc57726",
+  "swift_tests": {
+    "passed": 21,
+    "suites": 3
+  },
+  "delivery_policy_tests": {
+    "passed": 13
+  },
+  "cryptographic_verifier": "accepts valid signature; rejects changed bytes",
+  "workflow_lint": "actionlint passed for all four workflows",
+  "universal_build": [
+    "arm64",
+    "x86_64"
+  ],
+  "native_probe": {
+    "boolean_checks_passed": 21,
+    "connected_display_placements": 1,
+    "physical_input_integrity": "not verified"
+  },
+  "local_package": "round-trip extraction and deep strict codesign validation passed",
+  "credential_scan": "entire available history clean after exact non-secret repository UUID exclusion",
+  "approved_specification_sha256": "16b6b4bf4c471e456d98d4f04d9b2f26ba100f049d39d0616b6ec5f600f1c15d",
+  "canonical_prd": "unchanged, accepted and frozen",
+  "review": "in-place code review; no independent reviewer available",
+  "not_verified": [
+    "GitHub hosted CI and live App merge",
+    "Developer ID signing and Apple notarization with owner credentials",
+    "Signed installation and subsequent live update on clean supported Macs",
+    "External beta, S0 exit, accessibility and product release acceptance"
+  ]
+}

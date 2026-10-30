@@ -22,7 +22,7 @@ This repository is born under doc-warden v2 governance.
 - Current state is an S0 feasibility prototype. The dated S0 evidence is historical. It is not S0 exit, production, accessibility, likeness or release approval.
 - Keep the simulation in `SterlingCore`, with one runtime owner. The native host sends commands and renders snapshots. Rendering must never award gameplay effects. No frame-by-frame language model is required.
 - Passive visuals always ignore input. Only the explicit care window owns local gestures. Preserve cancellation, absence forgiveness and manual Hide/Pause precedence.
-- No global key/event monitor, event injection, document/screen-content access, network dependency, real-file mutation, or AX write is part of this prototype. Optional desktop integration and distribution remain separately gated in the approved specification.
+- No global key/event monitor, event injection, document/screen-content access, real-file mutation, or AX write is part of this prototype. The simulation stays local. Signed distribution builds may use Sparkle for owner-initiated or explicitly enabled update checks; local builds and probes never start the updater. Optional desktop integration and release acceptance remain separately gated.
 - Temporary geometric artwork is not a likeness. AppKit care controls are a feasibility harness; the approved SwiftUI production direction remains intact.
 
 ## Execution and verification
@@ -31,8 +31,8 @@ This repository is born under doc-warden v2 governance.
 - Use LOCAL `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity; do not change global identity or bypass commit guards.
 - `make verify` runs source checks, Swift domain/input tests, and the release app build. It requires macOS; a Linux-only static check cannot stand in for that evidence. `make probe` requires a logged-in desktop and is a separate explicit runtime check.
 - Keep generated app bundles, raw logs, caches and archives ignored. Commit small dated evidence when it changes an acceptance decision, with provenance and limits.
-- Make each implementation body reviewable in a draft PR. Run applicable checks and the required review process. Verify the actual target revision and effective merge gates before delivery claims.
-- No GitHub Actions workflow or runner is permitted. The runnerless controller is not yet qualified/enrolled for this repository. Do not arm auto-merge, invent checks, weaken protection, or mutate the controller to disguise that gap. Activation is a separate exact owner gate under its existing policy.
+- Make each implementation body reviewable in a PR; keep incomplete work draft and mark verified work ready. Run applicable checks and the required review process. Verify the actual target revision and effective merge gates before delivery claims.
+- Owner direction for this intended public repository is native GitHub Actions and hosted macOS runners, with an installed App approving verified ordinary PR heads and arming GitHub squash auto-merge. Private repositories retain their controller policy. The App excludes release PRs and protected automation paths; these remain owner-controlled. Agents do not manually pre-arm auto-merge or bypass failed checks. Follow `docs/runbooks/releasing.md` for activation and signed releases.
 - Source control, merge, UAT, signing/notarization, installation and release are distinct outcomes. Report only the ones actually verified.
 
 ## Documentation authority

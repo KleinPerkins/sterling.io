@@ -1,6 +1,6 @@
 # sterling.io
 
-A local native macOS companion inspired by Sterling. This private repository holds the approved product specification, the first feasibility prototype, and the evidence for work completed so far.
+A local native macOS companion inspired by Sterling. This repository holds the approved product specification, the first feasibility prototype, and the evidence for work completed so far.
 
 **Current stage: S0 feasibility, in progress.** The prototype is a local engineering preview with temporary geometric artwork and in-memory state. It is not a production release or a likeness approval.
 
@@ -19,7 +19,7 @@ The native app uses AppKit for the feasibility host and care controls, SpriteKit
 Requires a Mac with Apple command-line tools. The checked build is Apple silicon on macOS 26.7.2 with Swift 6.4. macOS 15 is the deployment target, not an already-validated compatibility claim.
 
 ```sh
-make verify        # source integrity, domain/input tests, release app build
+make verify        # source integrity, Swift/delivery tests, local release-mode build
 make probe         # brief native desktop probe; automatically exits
 make package       # preview kit; requires current passing build/test/probe receipts
 ```
@@ -34,8 +34,9 @@ Generated builds, caches, app bundles, current-run logs and preview archives sta
 | --- | --- |
 | `Sources/SterlingCore/` | Pure state, reducer, seeded replay, attention budget, geometry and gesture ownership |
 | `Sources/SterlingPrototype/` | Native lifecycle, passive panel, care mat, presentation and explicit probe mode |
-| `Tests/SterlingCoreTests/` | Domain and interaction regression tests |
-| `Scripts/` | Local build, test, probe and packaging entrypoints |
+| `Sources/SterlingUpdateSupport/` | Distribution-only updater configuration |
+| `Tests/` | Domain, interaction, updater and release trust-boundary tests |
+| `Scripts/` | Build, test, probe, packaging and GitHub delivery entrypoints |
 | `.planning/` | Doc-warden v2 identity, canonical semantic records and generated project/roadmap/state views |
 | `docs/adr/` | Numbered decisions created through doc-warden |
 | `docs/runbooks/` | Operational and manual verification procedures |
@@ -46,6 +47,12 @@ Generated builds, caches, app bundles, current-run logs and preview archives sta
 
 This is `KleinPerkins/sterling.io`, distinct from the existing `KleinPerkins/sterling` project. The canonical personal checkout is `~/dev/personal/sterling.io`; active source work follows the native worktree rule. Use local `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity and the installed session, identity and data guards.
 
-The repository inherits the standard private baseline and doc-warden v2 profile. No GitHub Actions workflow or hosted/self-hosted runner is used. Runnerless PR automation is **not activated**: qualification and enrollment remain an explicit gate owned by the existing controller. Do not fabricate verification checks, enable PR auto-merge, or bypass protections to close that gap.
+The repository retains doc-warden v2 governance. The owner has selected native GitHub Actions and hosted runners for public delivery, with App-controlled ordinary PR auto-merge and manual release approval. See [release and setup runbook](docs/runbooks/releasing.md) for activation, signing credentials, required checks and rollback. Workflow files alone do not prove that GitHub settings or credentials are configured. The private SECURITY template is replaced by a reviewed repository-specific policy; the global private baseline is unchanged.
 
-Use small reviewable branches and draft PRs, verify their exact source, and follow the currently effective owner merge policy. A pushed branch is source-controlled work, not proof of merge, release or UAT acceptance. Preserve approved documents; changes use reviewed successor versions.
+Use small reviewable branches and PRs (draft while incomplete), verify their exact source, and follow the currently effective owner merge policy. A pushed branch is source-controlled work, not proof of merge, release or UAT acceptance. Preserve approved documents; changes use reviewed successor versions.
+
+## Signed releases and updates
+
+Distribution builds use your configured Developer ID Application identity, hardened runtime and Apple notarization, with a separate Sterling Sparkle signature for update archives. Release PRs are manually merged; signing and publication wait for owner approval in GitHub's `release` environment. The workflow verifies the public update feed before making the release Latest.
+
+Local feasibility bundles are ad-hoc signed and never start the updater. Signed distribution builds offer **Check for Updates…** and an opt-in **Check for Updates Automatically** menu item. Automatic installation is disabled. Pipeline implementation is not external beta or product release approval.
