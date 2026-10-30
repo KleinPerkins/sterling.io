@@ -1,29 +1,13 @@
-<!-- BEGIN KleinPerkins/dev baseline (managed by KleinPerkins/dev; do not hand-edit — see _ops/baseline/README.md in KleinPerkins/dev) -->
-# Security Policy
+# Security policy
 
-This is a private repository owned by **KleinPerkins**. There is no public bug-bounty program.
+This repository is owned by **KleinPerkins**. There is no public bug-bounty program or response SLA.
 
-## Reporting a vulnerability
+Report vulnerabilities through GitHub's private vulnerability reporting when enabled, or contact the owner through an existing private channel. Do not include credentials or personal data in a public issue. Provide impact, reproduction steps and suggested remediation if known.
 
-If you discover a security issue in this repository, please report it privately rather than
-opening a public issue:
+Fixes follow reviewed PRs and required verification. Public automation executes untrusted PR source only in CI with a read-only token and no release credentials. The privileged App workflow reads PR metadata and runs only the default branch's script; it does not consume PR artifacts. Release and automation changes remain owner-controlled.
 
-- Preferred: open a **private security advisory** on this repository
-  (GitHub → Security → Advisories → "Report a vulnerability").
-- Alternative: reach the owner directly through an existing private channel.
+Release signing keys are restricted to the owner-reviewed GitHub `release` environment. Releases require Developer ID Application signing, hardened runtime, notarization, stapling and a separate Sparkle archive signature. Published release assets are not overwritten by the pipeline. A compromised signing or updater key requires an owner-led rotation and reviewed recovery; never silently generate a replacement key.
 
-Please include:
-- A description of the issue and its potential impact.
-- Steps to reproduce, or a proof of concept if available.
-- Any suggested remediation, if known.
+Scope covers this repository's code and configuration; report third-party vulnerabilities upstream. The project is still an S0 feasibility prototype and is not approved for production distribution.
 
-## Response
-
-This repo is maintained by a single owner (best-effort response; no formal SLA). Reports are
-triaged promptly and fixes are pushed directly to `main` once verified.
-
-## Scope
-
-This policy covers this repository's own code and configuration. It does not cover third-party
-services or dependencies; report those upstream.
-<!-- END KleinPerkins/dev baseline -->
+This repository-specific policy replaces the managed private-repository SECURITY template under the owner's public-delivery direction. It is an explicit baseline deviation, not a change to the global private-repository policy.
