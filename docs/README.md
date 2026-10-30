@@ -8,7 +8,7 @@ The repository uses the existing doc-warden v2 operating model. Its policy remai
 
 Its 48 R-numbered requirements, 72-behavior catalog, proposed architecture, validation gates and full delivery scope remain intact. Importing it does not close unresolved founder decisions or promote the temporary artwork to approved design. Future canonical authoring must preserve those IDs and explicitly map them if a tool needs a different identifier syntax.
 
-The `.planning` roadmap retains S0–S4 and expansion from the preserved specification. The canonical PRD intake is a draft, with one-to-one `REQ-STERLING-001`–`REQ-STERLING-048` aliases for the original `R-001`–`R-048` identifiers. The source identifiers and full specification body are unchanged. Canonical acceptance and later semantic changes require the validated doc-warden preview/consent procedure; no new product, design or phase acceptance is inferred.
+The `.planning` roadmap retains S0–S4 and expansion from the preserved specification. The canonical PRD is accepted as the planning baseline, with one-to-one `REQ-STERLING-001`–`REQ-STERLING-048` aliases for the original `R-001`–`R-048` identifiers. The source identifiers and full specification body are unchanged. The accepted PRD is frozen; semantic changes require reviewed successors through the validated doc-warden preview/consent procedure. Proposed defaults and unresolved founder decisions keep their existing status. Design, S0 exit and release approval remain separate.
 
 ## Architecture and execution
 
