@@ -30,3 +30,9 @@ agent-learnings.md
 ._*
 *.swp
 # END KleinPerkins/dev baseline
+
+# Sterling generated build and local verification output
+.build/
+.swiftpm/
+work/
+outputs/

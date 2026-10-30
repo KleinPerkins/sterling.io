@@ -1,0 +1,10 @@
+{
+  "kind": "sterling-tests/v1",
+  "checkedAt": "2026-10-30T03:43:25.951269+00:00",
+  "testCount": 17,
+  "suiteCount": 2,
+  "passed": true,
+  "domainSHA256": "7e74388a19d471f0cd44d592006edd3d6ca8586fbbb801b2af951af44973c214",
+  "testsSHA256": "24eef16e39280bfa65d0416cb558aaab9075bd0833abcce70e3ef54c64fd51e4",
+  "resultLogSHA256": "2c786ae667f70f0c835d212f6c17328ea8f3509afaca595e5a2a5d248acebd55"
+}

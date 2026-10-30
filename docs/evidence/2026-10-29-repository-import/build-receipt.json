@@ -1,0 +1,15 @@
+{
+  "kind": "sterling-build/v1",
+  "createdAt": "2026-10-30T03:44:01.917243+00:00",
+  "configuration": "release",
+  "architecture": "arm64",
+  "compiler": "Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)\nTarget: arm64-apple-macosx26.0",
+  "sdk": "27.0",
+  "binarySHA256": "ce71b566bc77f376eb52a700617c2251e37a211c002fe6de4524baa85adaf9df",
+  "sourceSHA256": "b0158089326c5f69644375e943a74bfaba8d9e2c9e4882663d71d85d181788a1",
+  "approvedSpecificationSHA256": "16b6b4bf4c471e456d98d4f04d9b2f26ba100f049d39d0616b6ec5f600f1c15d",
+  "signing": "Ad-hoc with hardened runtime; codesign --verify --strict passed",
+  "notarized": false,
+  "sandboxEntitlementProven": false,
+  "externalBetaReady": false
+}

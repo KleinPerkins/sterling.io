@@ -1,0 +1,60 @@
+{
+  "appWasInactiveWhileRendering": true,
+  "buildScope": "S0 harness and domain scaffold; no production acceptance claimed",
+  "careControlsFit": true,
+  "careOpaqueWindow": true,
+  "carePreviewWritten": true,
+  "displayPlacementChecks": [
+    {
+      "actualScale": 2,
+      "expectedScale": 2,
+      "withinVisibleBounds": true
+    },
+    {
+      "actualScale": 1,
+      "expectedScale": 1,
+      "withinVisibleBounds": true
+    }
+  ],
+  "displays": [
+    {
+      "height": 1440,
+      "scale": 2,
+      "width": 2560
+    },
+    {
+      "height": 1440,
+      "scale": 1,
+      "width": 2560
+    }
+  ],
+  "escapeClosesCare": true,
+  "foregroundUnchanged": true,
+  "gpuMillisecondsP95": 3.698166663525626,
+  "hiddenFramesStopped": true,
+  "hiddenTimerStopped": true,
+  "inactiveRenderingFrames": 25,
+  "keyboardPetting": true,
+  "keyboardPlay": true,
+  "keyboardStopsContact": true,
+  "keyboardStopsPlay": true,
+  "kind": "sterling-native-feasibility/v1",
+  "likeness": "Temporary shape study; not approved art",
+  "notarization": "NOT VERIFIED \u2014 no signing identity",
+  "oneVisibleCat": true,
+  "os": "Version 26.7.2 (Build 25G332)",
+  "overlayCannotBecomeKey": true,
+  "overlayIgnoresMouseEvents": true,
+  "pausedFramesStopped": true,
+  "physicalInputIntegrity": "NOT VERIFIED \u2014 no global events injected",
+  "previewWritten": true,
+  "resumeRenders": true,
+  "suspensionStopsTimer": true,
+  "wakePreservesManualPause": true,
+  "wakeResumesAvailableSession": true,
+  "binarySHA256": "ce71b566bc77f376eb52a700617c2251e37a211c002fe6de4524baa85adaf9df",
+  "checkedAt": "2026-10-30T03:45:03.595539+00:00",
+  "automatedChecksPassed": true,
+  "booleanCheckCount": 21,
+  "carePreviewMethod": "Own AppKit view hierarchy with own Metal scene bitmap; not a desktop screenshot"
+}

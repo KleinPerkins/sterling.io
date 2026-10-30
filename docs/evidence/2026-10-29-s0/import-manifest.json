@@ -1,0 +1,152 @@
+{
+  "schema": "sterling-import/v1",
+  "source_location": "original local feasibility workspace",
+  "files": [
+    {
+      "original_path": "Package.swift",
+      "repository_path": "Package.swift",
+      "sha256": "40feccec00475b2451d3b00be9d5267b87f6555df1fdd6cff58d897aa069dca4",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Scripts/build-app.sh",
+      "repository_path": "Scripts/build-app.sh",
+      "sha256": "6d951d151b6186d07f3c6737d2dfbfdc6b557cb539e426c04f64e91396857ebb",
+      "preserved_bytes": false,
+      "change": "Documentation path updated to repository lowercase docs convention; original source hash retained here."
+    },
+    {
+      "original_path": "Scripts/package.sh",
+      "repository_path": "Scripts/package.sh",
+      "sha256": "f23b4a80acfee645621517cca023806e3f04a8bfa9cb78da847e387754b35e52",
+      "preserved_bytes": false,
+      "change": "Documentation paths use lowercase docs; packaging includes verification entrypoints and documentation profile. Original source hash retained here."
+    },
+    {
+      "original_path": "Scripts/probe.sh",
+      "repository_path": "Scripts/probe.sh",
+      "sha256": "411d4b93a863004e6c40d01d6cdb26c410bd1c5aafb70eba4337f344a3bd4b36",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Scripts/swift.sh",
+      "repository_path": "Scripts/swift.sh",
+      "sha256": "446176d6a599164357a6fc535f55c2598a7da897cad5ea740aa5bc83235d41aa",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Scripts/test.sh",
+      "repository_path": "Scripts/test.sh",
+      "sha256": "e0e804854bcaa724e8aa036b0bc087458118f84b50aebf6dae6c5f6aeab4b0b9",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingCore/Character.swift",
+      "repository_path": "Sources/SterlingCore/Character.swift",
+      "sha256": "4da5caea934bf4a11d591c60590b355d0f9adf63ffeb8ff05e5fa91e5f9fce8d",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingCore/Interaction.swift",
+      "repository_path": "Sources/SterlingCore/Interaction.swift",
+      "sha256": "119dd84bd9800359c848d69bc5896678ed8e51639dab9c8b942d3e4f84c1892a",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingCore/Simulation.swift",
+      "repository_path": "Sources/SterlingCore/Simulation.swift",
+      "sha256": "b604e7435b98d4bd3f8161dfeea26d4db47a9eef814cafac7922a303b30bb95e",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/AppDelegate.swift",
+      "repository_path": "Sources/SterlingPrototype/AppDelegate.swift",
+      "sha256": "a6d269a4ce0850d13147b24b645d94fdb28cac929705265af12ffcf53ca33c05",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/CareMat.swift",
+      "repository_path": "Sources/SterlingPrototype/CareMat.swift",
+      "sha256": "5a6ff1c3f6c78f94b576a0bda4a9176fc2307daec2e6eda65fd18553f9689e30",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/CatScene.swift",
+      "repository_path": "Sources/SterlingPrototype/CatScene.swift",
+      "sha256": "bfe1c40033534456cfa71a8834c8b58e2b5ebc1a986b7721272c4597b73c4e07",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/Probe.swift",
+      "repository_path": "Sources/SterlingPrototype/Probe.swift",
+      "sha256": "5b5c5f28ee8ad7eeabbaa548e34455faaf490ecf5750674b1123d45a77374b5e",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/Renderer.swift",
+      "repository_path": "Sources/SterlingPrototype/Renderer.swift",
+      "sha256": "85ff4ea4a6878cc0d05c5e9cea3fd702b9156f79e2e6bd025c413932c44cf5fb",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Sources/SterlingPrototype/main.swift",
+      "repository_path": "Sources/SterlingPrototype/main.swift",
+      "sha256": "5056c7b679f9441615e59b441aa92980fef11f21cb5ae74f9382c1e20a591af5",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Tests/SterlingCoreTests/SimulationTests.swift",
+      "repository_path": "Tests/SterlingCoreTests/SimulationTests.swift",
+      "sha256": "a62e2ff7a5358f5f256595d913959b4ca73125ae2b8386a0bea7cb06e57358df",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "outputs/build-receipt.json",
+      "repository_path": "docs/evidence/2026-10-29-s0/build-receipt.json",
+      "sha256": "171933fa67b7184d437307ecdedef98ca4af5bbd2237cf276eb5e3d8f0ddb802",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "outputs/care-window.png",
+      "repository_path": "docs/evidence/2026-10-29-s0/care-window.png",
+      "sha256": "7c60c179da518a114d449faede6b5ee742b676502a794757637d9beaa0220838",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "outputs/native-probe.json",
+      "repository_path": "docs/evidence/2026-10-29-s0/native-probe.json",
+      "sha256": "97911cea1771f79220c91e951067e5e8a551126818fe0a01bc750a8dbe8ed3e8",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "outputs/shape-study.png",
+      "repository_path": "docs/evidence/2026-10-29-s0/shape-study.png",
+      "sha256": "4d41d6b974049440758d3842a64446b850efdeb55e311029ab1b06c8f4b66951",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "outputs/test-receipt.json",
+      "repository_path": "docs/evidence/2026-10-29-s0/test-receipt.json",
+      "sha256": "f299d42dd6749d6ca21f7e555aa2a0a004d5c6f84167a72128cb39f37682cb09",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Docs/Feasibility/Receipt.md",
+      "repository_path": "docs/evidence/2026-10-29-s0/verification.md",
+      "sha256": "dca59824473e39f4c794fd7cacce51474824a4c5b96fd3c249f02389aee7d9fb",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Docs/ApprovedProductSpecification.md",
+      "repository_path": "docs/reference/approved-product-specification-v1.md",
+      "sha256": "16b6b4bf4c471e456d98d4f04d9b2f26ba100f049d39d0616b6ec5f600f1c15d",
+      "preserved_bytes": true
+    },
+    {
+      "original_path": "Docs/Feasibility/ManualChecks.md",
+      "repository_path": "docs/runbooks/feasibility-manual-checks.md",
+      "sha256": "b485cd65e07677baa9357e8a6fdf6d6d01e41911d232f673253c81f09d95c03e",
+      "preserved_bytes": true
+    }
+  ]
+}
