@@ -84,7 +84,7 @@ struct ReplayTests {
     ]).run(expectedIdentity: identity)
     #expect(hidden == frozen)
     let returned = try replay(play + [
-      .command(.hide), .command(.pause), .reconcileReturn(absenceSeconds: 30 * 24 * 3_600),
+      .command(.hide), .command(.pause), .reconcileReturn(absenceSeconds: 30.0 * 24 * 3_600),
     ]).run(expectedIdentity: identity)
     #expect(returned.policy.hidden && returned.policy.paused)
     #expect(returned.character.familiarity == tired.character.familiarity)
