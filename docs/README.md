@@ -29,3 +29,12 @@ The original narrative used paths such as `Docs/ApprovedProductSpecification.md`
 Current app bundles, zip archives, caches and raw logs are reproducible outputs and are not committed. The evidence images are temporary artwork and do not establish likeness, animation or accessibility acceptance.
 
 [Repository import verification](evidence/2026-10-29-repository-import/README.md) records the fresh checks from the canonical checkout, separately from the preserved original S0 evidence.
+
+## Production foundation (drafts)
+
+These artifacts prepare implementation; they do not change PRD acceptance or close product gates.
+
+- [Development ecosystem](runbooks/development.md): fresh setup, modules/content/tests and delivery operations.
+- [Requirements, behaviors and founder decisions](../.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-2615167b-a644-5ad8-94d8-f819d7b9de84-v1.md): 48 requirements, 72 behaviors and interaction-state contracts.
+- [System and product design architecture](../.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-b6153447-65a9-5ba9-b5b3-e11b350ddc5b-v1.md): runtime boundaries, native care/settings, art pipeline and open gates.
+- [Execution and validation plan](../.planning/artifacts/PLAN-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-7da7fc92-3361-5326-bd7d-091f8fd00a19-v1.md): FND-01 plus dependency-ordered S0–S4 and expansion packages.

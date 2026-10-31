@@ -83,6 +83,70 @@ struct SimulationTests {
     budget.advance(seconds: 10_000, available: false)
     #expect(!(budget.canStart))
   }
+  @Test func testQuietAndFocusExitGrantGraceOnlyWhenAvailabilityResumes() {
+    for quiet in [true, false] {
+      var sim = Simulation()
+      sim.send(.setQuiet(false))
+      for _ in 0..<120 { sim.advance(seconds: 5) }
+      #expect(sim.attention.canStart)
+      sim.send(quiet ? .setQuiet(true) : .setFocus(true))
+      let before = sim.attention.availableSeconds
+      sim.advance(seconds: 5)
+      #expect(sim.attention.availableSeconds == before)
+      sim.send(quiet ? .setQuiet(false) : .setFocus(false))
+      #expect(!sim.attention.canStart)
+      #expect(sim.attention.blockedUntil == before + 60)
+      for _ in 0..<6 { sim.advance(seconds: 5) }
+      let deadline = sim.attention.blockedUntil
+      sim.send(quiet ? .setQuiet(false) : .setFocus(false))
+      #expect(sim.attention.blockedUntil == deadline)
+      for _ in 0..<7 { sim.advance(seconds: 5) }
+      #expect(sim.attention.canStart)
+    }
+  }
+  @Test func testNestedAvailabilityRestrictionsDoNotPrematurelyRestartGrace() {
+    var sim = Simulation()
+    sim.send(.setQuiet(false))
+    for _ in 0..<120 { sim.advance(seconds: 5) }
+    sim.send(.setQuiet(true))
+    sim.send(.setFocus(true))
+    let previousDeadline = sim.attention.blockedUntil
+    sim.send(.setQuiet(false))
+    #expect(!sim.policy.allowsAttention)
+    #expect(sim.attention.blockedUntil == previousDeadline)
+    sim.send(.setFocus(false))
+    #expect(sim.attention.blockedUntil == sim.attention.availableSeconds + 60)
+    #expect(!sim.attention.canStart)
+  }
+  @Test func testRedundantResumeAndUnpauseDoNotExtendGrace() {
+    for command in [SimulationCommand.resume, .unpause] {
+      var sim = Simulation()
+      sim.send(.setQuiet(false))
+      for _ in 0..<6 { sim.advance(seconds: 5) }
+      let deadline = sim.attention.blockedUntil
+      sim.send(command)
+      #expect(sim.attention.blockedUntil == deadline)
+    }
+  }
+  @Test func testNestedHidePauseQuietAndFocusGrantOnlyFinalGrace() {
+    var sim = Simulation()
+    sim.send(.setQuiet(false))
+    for _ in 0..<120 { sim.advance(seconds: 5) }
+    sim.send(.hide)
+    sim.send(.pause)
+    sim.send(.setQuiet(true))
+    sim.send(.setFocus(true))
+    let deadline = sim.attention.blockedUntil
+    for command in [SimulationCommand.resume, .unpause, .setQuiet(false)] {
+      sim.send(command)
+      #expect(!sim.policy.allowsAttention)
+      #expect(sim.attention.blockedUntil == deadline)
+    }
+    sim.send(.setFocus(false))
+    #expect(sim.policy.allowsAttention)
+    #expect(!sim.attention.canStart)
+    #expect(sim.attention.blockedUntil == sim.attention.availableSeconds + 60)
+  }
   @Test func testRollingBudgetAndUnansweredCooldownSurviveEncoding() throws {
     var budget = AttentionBudget()
     budget.advance(seconds: 60, available: true)

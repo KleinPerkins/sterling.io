@@ -56,3 +56,7 @@ Use small reviewable branches and PRs (draft while incomplete), verify their exa
 Distribution builds use your configured Developer ID Application identity, hardened runtime and Apple notarization, with a separate Sterling Sparkle signature for update archives. Release PRs are manually merged; signing and publication wait for owner approval in GitHub's `release` environment. The workflow verifies the public update feed before making the release Latest.
 
 Local feasibility bundles are ad-hoc signed and never start the updater. Signed distribution builds offer **Check for Updates…** and an opt-in **Check for Updates Automatically** menu item. Automatic installation is disabled. Pipeline implementation is not external beta or product release approval.
+
+## Production foundation
+
+[Development ecosystem](docs/runbooks/development.md), [requirements and behavior traceability](.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-2615167b-a644-5ad8-94d8-f819d7b9de84-v1.md), [system and product design architecture](.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-b6153447-65a9-5ba9-b5b3-e11b350ddc5b-v1.md), and [execution/validation plan](.planning/artifacts/PLAN-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-7da7fc92-3361-5326-bd7d-091f8fd00a19-v1.md) are draft foundation artifacts. The first independent package is FND-01 (core replay and attention-resume grace). Production S1 remains gated by physical evidence, founder decisions and approved art/design.
