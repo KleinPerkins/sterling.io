@@ -2,8 +2,9 @@
 
 ## Activation status
 
-The implementation defines the target delivery process. Verify live GitHub settings before calling it operational. At preparation on 2026-10-30, Sterling was **private**, with no required CI checks, release environment, Actions secrets or variables. No Developer ID identity was available on the preparation machine. Existing source and accepted PRD remain intact. No signed release has been produced.
+As verified on 2026-10-30, Sterling is public. Native GitHub Actions with mandatory full-SHA Action pins, the required `ci-required` gate, branch/tag protections, secret scanning and push protection, the protected `release` environment, and all required App/Apple/Sparkle setting names are configured. The installed App successfully approved and squash-merged ordinary [PR #6](https://github.com/KleinPerkins/sterling.io/pull/6) at the verified head; its main CI passed. Release-please successfully created [PR #5](https://github.com/KleinPerkins/sterling.io/pull/5), which remains owner-controlled.
 
+Configured names are not proof of usable secret values. Run the protected **Credential readiness** workflow below to validate the actual GitHub signing credentials. No product release, notarization submission, clean installation, or installed update has been verified. S0 exit and product release approval remain separate.
 The owner requested the public GitHub runner/App process and the same release controls as [Chaos Scheduler](https://github.com/KleinPerkins/chaos-scheduler/blob/e9519ddfa5c2fb5fd6017da8255729f7dfab3677/docs/RELEASING.md). Reference inspection is read-only. Sterling uses native Sparkle; Chaos uses Tauri. They share manual release PRs, owner release approval, Apple signing/notarization, verified updater assets and Latest protection, with different updater formats.
 
 ## One-time setup
@@ -33,9 +34,17 @@ Use the [Apple Developer certificate workflow](https://developer.apple.com/help/
 
 ## Routine pull requests
 
-Use Conventional Commit titles. CI runs source checks, Swift tests, delivery trust-boundary tests, workflow lint and a local app bundle build on macOS 15 and 26. `ci-required` succeeds only if the matrix succeeds. Interactive desktop probes and physical-input acceptance remain manual and are not represented by CI success.
+Use Conventional Commit titles. CI runs repository/Python/security checks on Ubuntu and complete Swift test coverage plus a local app bundle build on macOS 15 and 26. The [test and CI runbook](testing.md) defines exact coverage, configurable sharding, timing evidence and expansion policy. `ci-required` rejects failed, skipped, cancelled, missing, duplicate and inconsistent shard evidence. Interactive desktop probes and physical-input acceptance remain manual and are not represented by CI success.
 
 After successful CI, the App reviews only the exact current head of an ordinary, non-draft, same-repository PR and arms native squash auto-merge. Forks, newer heads, failed checks, incomplete file listings and untrusted authors are excluded. Release branches (`release-please--…`) and protected automation/signing paths remain manual. Dependabot follows the same trusted `workflow_run` path; no PR code or artifact receives the App token.
+
+## Checking credentials without a release
+
+From **Actions → Credential readiness → Run workflow**, select **main**. Review and approve its `release` environment request. The workflow has a read-only GitHub token and accepts no tag or publication input. This diagnostic approval does not authorize a product release.
+
+It imports the configured P12 into a temporary keychain, verifies the named Developer ID Application identity and team, signs and verifies a disposable binary with hardened runtime, authenticates to Apple using `notarytool history`, and signs a disposable payload with the configured Sparkle private key. An independent CryptoKit verifier must accept that signature with the public key and reject a modified payload. Keychain/search-list restoration and temporary-file cleanup must complete before success is recorded.
+
+The artifact `credential-readiness` contains only a safe Boolean receipt and commit, not certificates, private keys, passwords, Apple history, or signed probe files. The check does not build or notarize Sterling, create tags/releases, publish assets, or prove installation/update behavior. A green run proves credential readiness only; the release gates below still apply. Failure messages name the stage or setting without exposing values. Correct the relevant encrypted environment setting and rerun; do not remove the environment approval.
 
 ## Cutting a release
 
