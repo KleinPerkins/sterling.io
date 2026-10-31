@@ -1,4 +1,4 @@
-.PHONY: verify verify-source test test-delivery build probe package
+.PHONY: verify verify-source test test-delivery build probe package test-shard
 
 verify: verify-source test test-delivery build
 
@@ -22,3 +22,7 @@ probe:
 
 package:
 	Scripts/package.sh
+
+# Full make verify stays unfiltered. CI shard count lives in .github/test-shards.json.
+test-shard:
+	python3 Scripts/ci.py run --platform $(or $(PLATFORM),macos-26) --index $(or $(SHARD_INDEX),0) $(if $(SHARD_COUNT),--shards $(SHARD_COUNT),)
