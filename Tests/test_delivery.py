@@ -4,6 +4,8 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "Scripts"))
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -74,7 +76,7 @@ class ReleaseTests(unittest.TestCase):
 class AutoMergeTests(unittest.TestCase):
     def setUp(self):
         self.run={'event':'pull_request','conclusion':'success','head_repository':{'full_name':merge.REPO},'head_sha':'a'*40}
-        self.pr={'state':'open','draft':False,'base':{'ref':'main'},'head':{'repo':{'full_name':merge.REPO},'sha':'a'*40,'ref':'feature'},'author_association':'OWNER'}
+        self.pr={'state':'open','draft':False,'number':7,'base':{'ref':'main','repo':{'full_name':merge.REPO}},'head':{'repo':{'full_name':merge.REPO},'sha':'a'*40,'ref':'feature'},'author_association':'OWNER'}
     def test_ordinary_verified_head_eligible(self):
         self.assertTrue(merge.eligible(self.pr,self.run,['Sources/SterlingCore/Simulation.swift']))
     def test_release_and_draft_prs_require_human(self):
@@ -89,11 +91,11 @@ class AutoMergeTests(unittest.TestCase):
     def test_privileged_paths_are_manual(self):
         for path in ('.github/workflows/release.yml','Scripts/release.py','Configuration/signing.entitlements','Sources/SterlingPrototype/AppUpdater.swift','AGENTS.md','Makefile','.gitleaks.toml','Package.resolved','VERSION'):
             with self.subTest(path=path):self.assertFalse(merge.eligible(self.pr,self.run,[path]))
-    def test_dependabot_is_supported_but_untrusted_authors_are_not(self):
+    def test_dependabot_and_untrusted_authors_cannot_use_ordinary_policy(self):
         self.pr['author_association']='NONE';self.pr['user']={'login':'unknown'}
         self.assertFalse(merge.eligible(self.pr,self.run,['README.md']))
         self.pr['user']['login']='dependabot[bot]'
-        self.assertTrue(merge.eligible(self.pr,self.run,['README.md']))
+        self.assertFalse(merge.eligible(self.pr,self.run,['README.md']))
     def test_failed_ci_and_empty_file_lists_never_approve(self):
         self.assertFalse(merge.eligible(self.pr,self.run,[]))
         self.run['conclusion']='failure';self.assertFalse(merge.eligible(self.pr,self.run,['README.md']))

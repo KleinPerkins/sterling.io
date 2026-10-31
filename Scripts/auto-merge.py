@@ -1,60 +1,77 @@
 #!/usr/bin/env python3
-"""Base-branch-only workflow_run handler. Never executes pull request content."""
-import fnmatch, json, os, subprocess
+"""Trusted workflow_run handler for ordinary PRs; dependency PRs have their own policy."""
+import fnmatch
+import json
+import os
 from pathlib import Path
+import sys
 
-REPO = "KleinPerkins/sterling.io"
-PROTECTED = (".github/*", ".gitleaks*", "Makefile", "AGENTS.md", "SECURITY.md", "Scripts/*", "Configuration/*",
-             "Package.*", "VERSION", "release-please*", ".release-please*",
-             "Sources/SterlingUpdateSupport/*", "Sources/SterlingPrototype/AppUpdater.swift")
+from github_automation import (REPO, SHA, AutomationError, Reporter, api, pages, same_repo_pr,
+                               dependabot_author, reviewer_identity, approve_and_arm, enable_merge)
+
+PROTECTED = ('.github/*', '.gitleaks*', 'Makefile', 'AGENTS.md', 'SECURITY.md', 'Scripts/*', 'Configuration/*',
+             'Package.*', 'VERSION', 'release-please*', '.release-please*',
+             'Sources/SterlingUpdateSupport/*', 'Sources/SterlingPrototype/AppUpdater.swift')
+
 
 def eligible(pr, run, files):
-    if run.get("event") != "pull_request" or run.get("conclusion") != "success": return False
-    if run.get("head_repository", {}).get("full_name") != REPO: return False
-    if pr.get("state") != "open" or pr.get("draft") or pr.get("base", {}).get("ref") != "main": return False
-    if pr.get("head", {}).get("repo", {}).get("full_name") != REPO: return False
-    if pr["head"]["sha"] != run.get("head_sha"): return False
-    if pr["head"]["ref"].startswith("release-please--"): return False
-    if pr.get("author_association") not in ("OWNER", "MEMBER", "COLLABORATOR") and pr.get("user", {}).get("login") != "dependabot[bot]": return False
+    if run.get('event') != 'pull_request' or run.get('conclusion') != 'success':
+        return False
+    if run.get('head_repository', {}).get('full_name') != REPO or not same_repo_pr(pr):
+        return False
+    if pr['head']['sha'] != run.get('head_sha'):
+        return False
+    if pr['head'].get('ref', '').startswith(('release-please--', 'dependabot/')) or dependabot_author(pr):
+        return False
+    if pr.get('author_association') not in ('OWNER', 'MEMBER', 'COLLABORATOR'):
+        return False
     return bool(files) and not any(fnmatch.fnmatchcase(path, pattern) for path in files for pattern in PROTECTED)
 
-def api(path, *, payload=None, token=None, paginate=False):
-    command = ["gh", "api", path]
-    if paginate: command += ["--paginate", "--slurp"]
-    if payload is not None: command += ["--method", "POST", "--input", "-"]
-    env = dict(os.environ)
-    if token: env["GH_TOKEN"] = token
-    result = subprocess.run(command, input=json.dumps(payload) if payload is not None else None,
-                            text=True, capture_output=True, check=True, env=env)
-    return json.loads(result.stdout)
 
 def main():
-    event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
-    run = event["workflow_run"]
-    if event["repository"]["full_name"] != REPO: raise SystemExit("Unexpected repository")
-    # Resolve through the commit rather than interpolating an untrusted branch name.
-    prs = api(f"repos/{REPO}/commits/{run['head_sha']}/pulls")
-    for candidate in prs:
-        number = int(candidate["number"])
-        path = f"repos/{REPO}/pulls/{number}"
-        pr = api(path)
-        pages = api(path + "/files?per_page=100", paginate=True)
-        entries = [f for page in pages for f in page]
-        # A rename must not evade protected-path review by moving the old path.
-        files = [path for f in entries for path in (f["filename"], f.get("previous_filename")) if path]
-        if len(entries) != pr["changed_files"] or not eligible(pr, run, files):
-            print(f"PR #{number}: manual review or newer head; skipped.")
-            continue
-        jobs = api(f"repos/{REPO}/actions/runs/{int(run['id'])}/jobs?per_page=100", token=os.environ["CI_READ_TOKEN"])
-        if not any(j["name"] == "ci-required" and j["conclusion"] == "success" for j in jobs["jobs"]):
-            raise SystemExit("The completed run has no successful ci-required gate")
-        head = pr["head"]["sha"]
-        if api(path)["head"]["sha"] != head: continue
-        api(path + "/reviews", payload={"event": "APPROVE", "commit_id": head})
-        # Exact commit review plus stale-review dismissal and the CLI's head guard
-        # keep a later push from inheriting this approval.
-        subprocess.run(["gh", "pr", "merge", str(number), "--repo", REPO,
-                        "--auto", "--squash", "--match-head-commit", head], check=True)
-        print(f"PR #{number}: App approval recorded; GitHub evaluates merge rules.")
+    report = Reporter(os.environ.get('GITHUB_STEP_SUMMARY'))
+    failures = 0
+    try:
+        event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+        run = event['workflow_run']
+        if event['repository']['full_name'] != REPO:
+            raise AutomationError('Unexpected repository')
+        if run.get('event') != 'pull_request' or run.get('conclusion') != 'success':
+            return 0
+        if not SHA.fullmatch(run.get('head_sha', '')):
+            raise AutomationError('Invalid workflow commit SHA')
+        candidates = pages(api, f"repos/{REPO}/commits/{run['head_sha']}/pulls?per_page=100")
+        reviewer = None
+        for candidate in candidates:
+            number = int(candidate['number'])
+            try:
+                path = f'repos/{REPO}/pulls/{number}'
+                pr = api(path)
+                # Author identity, not the actor of a synchronize/CI event, routes
+                # Dependabot out of this ordinary-PR policy.
+                if dependabot_author(pr):
+                    report(f'PR #{number}: Dependabot maintenance owns this PR; skipped.')
+                    continue
+                entries = pages(api, path + '/files?per_page=100')
+                files = [name for entry in entries for name in (entry['filename'], entry.get('previous_filename')) if name]
+                if len(entries) != pr['changed_files'] or not eligible(pr, run, files):
+                    report(f'PR #{number}: manual review, ineligible identity or newer head; skipped.')
+                    continue
+                if reviewer is None:
+                    reviewer = reviewer_identity(api, os.environ.get('REVIEWER_LOGIN', ''))
+                approve_and_arm(pr, request=api, merge=enable_merge, reviewer=reviewer,
+                                eligible=lambda latest: eligible(latest, run, files),
+                                read_token=os.environ.get('CI_READ_TOKEN', ''), report=report)
+            except Exception as error:
+                failures += 1
+                reason = str(error) if isinstance(error, AutomationError) else type(error).__name__
+                report(f'PR #{number}: {reason}', error=True)
+        return 1 if failures else 0
+    except Exception as error:
+        reason = str(error) if isinstance(error, AutomationError) else type(error).__name__
+        report('Ordinary PR automation failed: ' + reason, error=True)
+        return 1
 
-if __name__ == "__main__": main()
+
+if __name__ == '__main__':
+    sys.exit(main())

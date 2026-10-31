@@ -12,9 +12,13 @@ updates:
     open-pull-requests-limit: 5
 # END KleinPerkins/dev baseline
 
-# Repository-owned Swift updates; signing/update dependencies remain owner-reviewed.
+# Repository-owned continuation of the Actions entry above. All update sizes qualify.
+    rebase-strategy: auto
+
+# Swift dependencies use the same CI-gated automatic approval policy.
   - package-ecosystem: "swift"
     directory: "/"
     schedule:
       interval: "weekly"
+    rebase-strategy: auto
     open-pull-requests-limit: 3
