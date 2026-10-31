@@ -27,4 +27,4 @@ The shape study establishes renderer operation only. After a reference photo and
 
 ## FZ-05 — distribution
 
-Choose and enroll the canonical private repository under the personal workspace policy. Prove the intended app sandbox/entitlements, Developer ID signing and notarization, clean-machine launch, offline operation, supported OS/CPU matrix and quit cleanup. A local ad-hoc signature does not meet these requirements.
+Public repository enrollment and native GitHub delivery are established; credential readiness was verified by run 41164898459. Do not repeat setup or recreate keys. Prove the intended app sandbox/entitlements, Developer ID signing and notarization, clean-machine launch, offline operation, supported OS/CPU matrix and quit cleanup. A local ad-hoc signature does not meet these requirements.

@@ -9,7 +9,7 @@ public struct SimulationSnapshot: Codable, Equatable, Sendable {
   public var notice: String
 }
 
-public enum SimulationCommand: Sendable {
+public enum SimulationCommand: Codable, Equatable, Sendable {
   case startPet, endContact, startPlay, stopInteraction, offerBasicFood, settle
   case hide, resume, pause, unpause
   case setQuiet(Bool)
@@ -49,6 +49,11 @@ public struct Simulation: Codable, Equatable, Sendable {
     phaseRemaining = 3
   }
   public mutating func send(_ command: SimulationCommand) {
+    let wasAvailable = policy.allowsAttention
+    defer {
+      // Only a real return to availability starts grace; repeated controls cannot extend it.
+      if !wasAvailable && policy.allowsAttention { attention.resumeGrace() }
+    }
     switch command {
     case .hide:
       policy.hidden = true
@@ -60,11 +65,9 @@ public struct Simulation: Codable, Equatable, Sendable {
       notice = "Paused."
     case .resume:
       policy.hidden = false
-      attention.resumeGrace()
       notice = policy.paused ? "Paused." : "Back in his nook."
     case .unpause:
       policy.paused = false
-      attention.resumeGrace()
       notice = "Quiet company."
     case .setQuiet(let quiet): policy.quiet = quiet
     case .setFocus(let focused):

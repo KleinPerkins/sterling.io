@@ -4,10 +4,12 @@
 
 As verified on 2026-10-30, Sterling is public. Native GitHub Actions with mandatory full-SHA Action pins, the required `ci-required` gate, branch/tag protections, secret scanning and push protection, the protected `release` environment, and all required App/Apple/Sparkle setting names are configured. The installed App successfully approved and squash-merged ordinary [PR #6](https://github.com/KleinPerkins/sterling.io/pull/6) at the verified head; its main CI passed. Release-please successfully created [PR #5](https://github.com/KleinPerkins/sterling.io/pull/5), which remains owner-controlled.
 
-Configured names are not proof of usable secret values. Run the protected **Credential readiness** workflow below to validate the actual GitHub signing credentials. No product release, notarization submission, clean installation, or installed update has been verified. S0 exit and product release approval remain separate.
+The nonpublishing [Credential readiness run 41164898459](https://github.com/KleinPerkins/sterling.io/actions/runs/41164898459) succeeded at `f1f1ff3c2f3c5aa207b72a81c7ef4713173372eb`: Developer ID test signing, notarization authentication and matching Sparkle credentials passed. Do not recreate keys or request their values. Re-run the diagnostic only when credential changes or a concrete failure warrant it. No product release, notarization submission, clean installation, or installed update has been verified. S0 exit and product release approval remain separate.
 The owner requested the public GitHub runner/App process and the same release controls as [Chaos Scheduler](https://github.com/KleinPerkins/chaos-scheduler/blob/e9519ddfa5c2fb5fd6017da8255729f7dfab3677/docs/RELEASING.md). Reference inspection is read-only. Sterling uses native Sparkle; Chaos uses Tauri. They share manual release PRs, owner release approval, Apple signing/notarization, verified updater assets and Latest protection, with different updater formats.
 
-## One-time setup
+## One-time setup (established; recovery reference)
+
+Steps 1–6 describe the existing configuration, not outstanding setup work. Read live state before changing it. Step 7 remains product distribution proof.
 
 1. Review public exposure of all repository history and approve visibility explicitly. A secret scan is evidence, not permission to publish. This change grants no additional software license.
 2. Install the reviewer GitHub App for **this repository only**, with Contents and Pull requests read/write and Metadata read. Store `AUTOMERGE_APP_ID` and `AUTOMERGE_APP_PRIVATE_KEY` as repository Actions secrets. Do not copy or display another repository's credential values. The App must not bypass branch rules.
