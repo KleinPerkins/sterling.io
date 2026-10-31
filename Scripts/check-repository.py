@@ -10,7 +10,7 @@ spec = root / "docs/reference/approved-product-specification-v1.md"
 expected = "16b6b4bf4c471e456d98d4f04d9b2f26ba100f049d39d0616b6ec5f600f1c15d"
 if hashlib.sha256(spec.read_bytes()).hexdigest() != expected:
     raise SystemExit("The approved v1 specification changed. Restore it and author a successor.")
-required_workflows = {"ci.yml", "app-auto-merge.yml", "release-please.yml", "release.yml"}
+required_workflows = {"ci.yml", "app-auto-merge.yml", "release-please.yml", "release.yml", "credential-readiness.yml"}
 workflows = {p.name for p in (root / ".github/workflows").glob("*.yml")}
 if not required_workflows.issubset(workflows):
     raise SystemExit("The native GitHub delivery workflows are incomplete.")

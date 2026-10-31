@@ -11,3 +11,10 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 # END KleinPerkins/dev baseline
+
+# Repository-owned Swift updates; signing/update dependencies remain owner-reviewed.
+  - package-ecosystem: "swift"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
