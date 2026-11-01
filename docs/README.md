@@ -38,3 +38,7 @@ These artifacts prepare implementation; they do not change PRD acceptance or clo
 - [Requirements, behaviors and founder decisions](../.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-2615167b-a644-5ad8-94d8-f819d7b9de84-v1.md): 48 requirements, 72 behaviors and interaction-state contracts.
 - [System and product design architecture](../.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-b6153447-65a9-5ba9-b5b3-e11b350ddc5b-v1.md): runtime boundaries, native care/settings, art pipeline and open gates.
 - [Execution and validation plan](../.planning/artifacts/PLAN-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-7da7fc92-3361-5326-bd7d-091f8fd00a19-v1.md): FND-01 plus dependency-ordered S0–S4 and expansion packages.
+
+## Foundation delivery evidence
+
+[2026-10-31: FND-01 and foundation delivery](evidence/2026-10-31-foundation/verification.md) records exact local/hosted checks, source and coverage identities, PR #9 merge and remaining product gates. The foundation documents remain drafts.
