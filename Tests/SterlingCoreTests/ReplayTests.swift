@@ -5,7 +5,8 @@ import Testing
 
 struct ReplayTests {
   private let identity = SimulationReplayIdentity(
-    codeVersion: "s0-reducer-v1", contentVersion: "synthetic-fixtures-v1", tuningVersion: "prototype-v1")
+    codeVersion: "s1-session-v2", contentVersion: "synthetic-fixtures-v2",
+    tuningVersion: "prototype-v1")
 
   private func replay(_ inputs: [SimulationReplayInput]) -> SimulationReplay {
     .init(identity: identity, seed: 123, records: inputs.enumerated().map {
@@ -13,79 +14,105 @@ struct ReplayTests {
     })
   }
 
-  @Test func testPortableCareReplayMatchesDirectReducer() throws {
+  private func direct(_ inputs: [SimulationReplayInput]) -> SimulationReplayRunResult {
+    var simulation = Simulation(seed: 123)
+    var interactionResults: [SimulationReplayInteractionResult] = []
+    for (sequence, input) in inputs.enumerated() {
+      switch input {
+      case .command(let command): _ = simulation.send(command)
+      case .interaction(let interaction):
+        interactionResults.append(
+          .init(recordSequence: sequence, result: simulation.accept(interaction)))
+      case .advance(let seconds): _ = simulation.advance(seconds: seconds)
+      case .reconcileReturn(let seconds):
+        _ = simulation.reconcileReturn(absenceSeconds: seconds)
+      }
+    }
+    return .init(simulation: simulation, interactionResults: interactionResults)
+  }
+
+  @Test func testReplayV2OwnedSessionMatchesDirectReducer() throws {
+    let pet = token(1)
+    let play = token(2)
     let inputs: [SimulationReplayInput] = [
-      .command(.startPet), .advance(seconds: 5, contactQuality: 1),
-      .command(.endContact), .command(.startPlay), .advance(seconds: 5, contactQuality: nil),
-      .command(.hide), .command(.pause), .advance(seconds: 5, contactQuality: 1),
-      .reconcileReturn(absenceSeconds: 7 * 24 * 3_600), .command(.resume), .command(.unpause),
-      .command(.offerBasicFood), .advance(seconds: 3, contactQuality: nil),
+      .interaction(begin(pet, mode: .pet)),
+      .interaction(petStep(pet, 1, seconds: 5)),
+      .interaction(petStep(pet, 1, seconds: 5)),
+      .interaction(end(pet, 2)),
+      .interaction(begin(play, mode: .play)),
+      .interaction(playStep(play, 1, seconds: 5)),
+      .interaction(petStep(pet, 3)),
+      .command(.hide), .command(.pause), .advance(seconds: 5),
+      .reconcileReturn(absenceSeconds: 7 * 24 * 3_600),
+      .command(.resume), .command(.unpause), .command(.offerBasicFood), .advance(seconds: 3),
     ]
     let original = replay(inputs)
     let data = try JSONEncoder().encode(original)
     let decoded = try SimulationReplay.decode(data, expectedIdentity: identity)
     #expect(decoded == original)
-    let first = try original.run(expectedIdentity: identity)
-    #expect(try decoded.run(expectedIdentity: identity) == first)
-    var direct = Simulation(seed: 123)
-    direct.send(.startPet)
-    direct.advance(seconds: 5, contactQuality: 1)
-    direct.send(.endContact)
-    direct.send(.startPlay)
-    direct.advance(seconds: 5)
-    direct.send(.hide)
-    direct.send(.pause)
-    direct.advance(seconds: 5, contactQuality: 1)
-    direct.reconcileReturn(absenceSeconds: 7 * 24 * 3_600)
-    direct.send(.resume)
-    direct.send(.unpause)
-    direct.send(.offerBasicFood)
-    direct.advance(seconds: 3)
-    #expect(first == direct)
+
+    let replayed = try decoded.runWithResults(expectedIdentity: identity)
+    let reduced = direct(inputs)
+    #expect(replayed == reduced)
+    #expect(replayed.interactionResults.map(\.disposition) == [
+      .accepted, .accepted, .ignored(.duplicateOrOutOfOrder(lastAccepted: 1)), .accepted,
+      .accepted, .accepted, .ignored(.staleGeneration(current: 2)),
+    ])
+    #expect(replayed.simulation.policy.hidden == false)
+    #expect(replayed.simulation.policy.paused == false)
   }
 
   @Test func testPettingCurveAndNaturalBoundaryReplay() throws {
-    let contact = SimulationReplayInput.advance(seconds: 0.1, contactQuality: 1)
-    let rising = replay([.command(.startPet)] + Array(repeating: contact, count: 100))
-    let early = try rising.run(expectedIdentity: identity)
-    #expect(early.character.receptiveness > Simulation().character.receptiveness)
-    // Find the actual natural boundary without assuming a tuned duration is an accepted requirement.
-    var inputs: [SimulationReplayInput] = [.command(.startPet)]
-    var boundary = Simulation(seed: 123)
-    boundary.send(.startPet)
-    for _ in 0..<1_500 {
-      inputs.append(contact)
-      boundary.advance(seconds: 0.1, contactQuality: 1)
-      if boundary.activity != .petting { break }
+    let pet = token(1)
+    let contact = SimulationReplayInput.interaction(petStep(pet, 1, quality: 1))
+    var risingInputs: [SimulationReplayInput] = [.interaction(begin(pet, mode: .pet))]
+    risingInputs += (1...100).map {
+      .interaction(petStep(pet, UInt64($0), quality: 1))
     }
-    #expect(boundary.activity != .petting)
-    let satisfaction = boundary.character.contactSatisfaction
-    inputs.append(.command(.startPet))
-    let reentered = try replay(inputs).run(expectedIdentity: identity)
-    #expect(reentered.character.contactSatisfaction == satisfaction)
-    #expect(reentered.activity != .petting)
+    let early = try replay(risingInputs).run(expectedIdentity: identity)
+    #expect(early.character.receptiveness > Simulation().character.receptiveness)
+    #expect(contact != .advance(seconds: 0.1))
+
+    var inputs: [SimulationReplayInput] = [.interaction(begin(pet, mode: .pet))]
+    var directSimulation = Simulation(seed: 123)
+    _ = directSimulation.accept(begin(pet, mode: .pet))
+    for ordinal in UInt64(1)...UInt64(1_500) {
+      inputs.append(.interaction(petStep(pet, ordinal)))
+      let result = directSimulation.accept(petStep(pet, ordinal))
+      if result.terminals.first?.reason == .naturalBoundary { break }
+    }
+    #expect(directSimulation.activity != .petting)
+    let replayed = try replay(inputs).runWithResults(expectedIdentity: identity)
+    #expect(replayed.simulation == directSimulation)
+    #expect(replayed.interactionResults.last?.terminals.first?.reason == .naturalBoundary)
   }
 
   @Test func testPlayFatigueAndForgivingReturnReplay() throws {
-    let play: [SimulationReplayInput] = [.command(.startPlay)] + Array(
-      repeating: .advance(seconds: 1, contactQuality: nil), count: 150)
-    let tired = try replay(play).run(expectedIdentity: identity)
-    let reentered = try replay(play + [.command(.stopInteraction), .command(.startPlay)])
-      .run(expectedIdentity: identity)
+    let play = token(1)
+    let playInputs: [SimulationReplayInput] = [.interaction(begin(play, mode: .play))]
+      + (1...150).map { .interaction(playStep(play, UInt64($0), seconds: 1)) }
+    let tired = try replay(playInputs).run(expectedIdentity: identity)
+    let reentered = try replay(
+      playInputs + [.interaction(end(play, 151)), .interaction(begin(token(2), mode: .play))]
+    ).run(expectedIdentity: identity)
     #expect(reentered.toy.boredom == tired.toy.boredom)
     #expect(reentered.character.energy == tired.character.energy)
-    #expect(reentered.toy.interest(character: reentered.character)
-      < Simulation().toy.interest(character: Simulation().character))
-    let hidden = try replay(play + [.command(.hide), .command(.pause)])
+    #expect(
+      reentered.toy.interest(character: reentered.character)
+        < Simulation().toy.interest(character: Simulation().character))
+
+    let hidden = try replay(playInputs + [.command(.hide), .command(.pause)])
       .run(expectedIdentity: identity)
-    let frozen = try replay(play + [
-      .command(.hide), .command(.pause), .advance(seconds: 5, contactQuality: 1),
-      .command(.startPet), .command(.startPlay), .command(.offerBasicFood),
-    ]).run(expectedIdentity: identity)
+    let frozen = try replay(
+      playInputs + [.command(.hide), .command(.pause), .advance(seconds: 5)]
+    ).run(expectedIdentity: identity)
     #expect(hidden == frozen)
-    let returned = try replay(play + [
-      .command(.hide), .command(.pause), .reconcileReturn(absenceSeconds: 30.0 * 24 * 3_600),
-    ]).run(expectedIdentity: identity)
+    let returned = try replay(
+      playInputs + [
+        .command(.hide), .command(.pause),
+        .reconcileReturn(absenceSeconds: 30.0 * 24 * 3_600),
+      ]
+    ).run(expectedIdentity: identity)
     #expect(returned.policy.hidden && returned.policy.paused)
     #expect(returned.character.familiarity == tired.character.familiarity)
     #expect(returned.character.energy >= 0.65)
@@ -93,14 +120,53 @@ struct ReplayTests {
     #expect(returned.attention.availableSeconds == hidden.attention.availableSeconds)
   }
 
+  @Test func testReplayV2FutureGenerationRequiresBegin() throws {
+    let first = token(1)
+    let future = token(2)
+    let inputs: [SimulationReplayInput] = [
+      .interaction(petStep(first, 1)), .interaction(end(first, 1)),
+      .interaction(begin(first, mode: .pet)),
+      .interaction(playStep(future, 1)), .interaction(end(future, 1)),
+      .interaction(begin(future, mode: .play)),
+    ]
+
+    let replayed = try replay(inputs).runWithResults(expectedIdentity: identity)
+
+    #expect(replayed == direct(inputs))
+    #expect(replayed.interactionResults.map(\.disposition) == [
+      .ignored(.beginRequired(current: 0)), .ignored(.beginRequired(current: 0)), .accepted,
+      .ignored(.beginRequired(current: 1)), .ignored(.beginRequired(current: 1)), .accepted,
+    ])
+    #expect(replayed.simulation.highestAcceptedInteractionGeneration == 2)
+    #expect(replayed.simulation.snapshot.interaction?.token == future)
+  }
+
+  @Test func testReplayV2InteractionStepsCountTowardActiveWorkLimit() throws {
+    let pet = token(1)
+    var exact: [SimulationReplayInput] = [.interaction(begin(pet, mode: .pet))]
+    exact += (1...5_759).map {
+      .interaction(petStep(pet, UInt64($0), seconds: 5))
+    }
+    exact.append(.advance(seconds: 5))
+    let exactFixture = replay(exact)
+    try exactFixture.validate(expectedIdentity: identity)
+
+    var over = exact
+    over.append(.interaction(petStep(pet, 5_760, seconds: 0.1)))
+    #expect(throws: SimulationReplayError.tooMuchActiveTime) {
+      try replay(over).run(expectedIdentity: identity)
+    }
+  }
+
   @Test func testReplayRejectsUnsupportedIdentityAndSchema() throws {
     let fixture = replay([])
     let other = SimulationReplayIdentity(
-      codeVersion: "future", contentVersion: identity.contentVersion, tuningVersion: identity.tuningVersion)
+      codeVersion: "future", contentVersion: identity.contentVersion,
+      tuningVersion: identity.tuningVersion)
     #expect(throws: SimulationReplayError.incompatibleIdentity) {
       try fixture.run(expectedIdentity: other)
     }
-    let future = SimulationReplay(schemaVersion: 2, identity: identity, seed: 1, records: [])
+    let future = SimulationReplay(schemaVersion: 3, identity: identity, seed: 1, records: [])
     #expect(throws: SimulationReplayError.unsupportedSchema) {
       try future.run(expectedIdentity: identity)
     }
@@ -119,16 +185,29 @@ struct ReplayTests {
     }
   }
 
-  @Test func testReplayRejectsInvalidTimeAndQualityBeforeExecution() {
+  @Test func testReplayRejectsInvalidTimeQualityAndInteractionBeforeExecution() {
+    let pet = token(1)
     for time in [Double.nan, .infinity, -1, 0, 5.1] {
-      let fixture = replay([.command(.startPlay), .advance(seconds: time, contactQuality: nil)])
-      #expect(throws: SimulationReplayError.invalidTime(index: 1)) {
-        try fixture.run(expectedIdentity: identity)
+      #expect(throws: SimulationReplayError.invalidTime(index: 0)) {
+        try replay([.advance(seconds: time)]).run(expectedIdentity: identity)
+      }
+      #expect(throws: SimulationReplayError.invalidTime(index: 0)) {
+        try replay([.interaction(petStep(pet, 1, seconds: time))])
+          .run(expectedIdentity: identity)
       }
     }
     for quality in [Double.nan, .infinity, -0.1, 1.1] {
       #expect(throws: SimulationReplayError.invalidQuality(index: 0)) {
-        try replay([.advance(seconds: 1, contactQuality: quality)]).run(expectedIdentity: identity)
+        try replay([.interaction(petStep(pet, 1, seconds: 1, quality: quality))])
+          .run(expectedIdentity: identity)
+      }
+    }
+    for input in [
+      petStep(pet, UInt64.max), petStep(pet, 1, region: .outside, quality: 1),
+      begin(token(0), mode: .pet),
+    ] {
+      #expect(throws: SimulationReplayError.invalidInteraction(index: 0)) {
+        try replay([.interaction(input)]).run(expectedIdentity: identity)
       }
     }
     for time in [Double.nan, .infinity, -1] {
@@ -138,28 +217,23 @@ struct ReplayTests {
     }
   }
 
-  @Test func testReplayRejectsExcessiveRecordsTimeAndImportSize() {
+  @Test func testReplayRejectsExcessiveRecordsAndImportSize() {
     #expect(throws: SimulationReplayError.tooManyRecords) {
       try replay(Array(repeating: .command(.settle), count: SimulationReplay.maximumRecords + 1))
         .run(expectedIdentity: identity)
     }
-    #expect(throws: SimulationReplayError.tooMuchActiveTime) {
-      try replay(Array(repeating: .advance(seconds: 5, contactQuality: nil), count: 5_761))
-        .run(expectedIdentity: identity)
-    }
     #expect(throws: SimulationReplayError.tooManyBytes) {
-      try SimulationReplay.decode(Data(repeating: 0, count: SimulationReplay.maximumBytes + 1),
-        expectedIdentity: identity)
+      try SimulationReplay.decode(
+        Data(repeating: 0, count: SimulationReplay.maximumBytes + 1), expectedIdentity: identity)
     }
   }
 
   @Test func testDecodedFixtureStillRequiresValidation() throws {
-    let invalid = replay([.command(.hide), .advance(seconds: 6, contactQuality: nil)])
+    let invalid = replay([.command(.hide), .advance(seconds: 6)])
     let bytes = try JSONEncoder().encode(invalid)
     #expect(throws: SimulationReplayError.invalidTime(index: 1)) {
       try SimulationReplay.decode(bytes, expectedIdentity: identity)
     }
-    // Even clients using Codable directly cannot bypass run's whole-envelope validation.
     let decoded = try JSONDecoder().decode(SimulationReplay.self, from: bytes)
     #expect(throws: SimulationReplayError.invalidTime(index: 1)) {
       try decoded.run(expectedIdentity: identity)

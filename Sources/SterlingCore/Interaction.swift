@@ -43,8 +43,8 @@ public struct DisplayGeometry: Codable, Equatable, Sendable {
     .init(x: point.x * scale, y: point.y * scale)
   }
 }
-public enum InteractionMode: String, Sendable { case pet, play }
-public enum BodyRegion: Sendable { case head, back, sensitive, outside }
+public enum InteractionMode: String, Codable, Equatable, Sendable { case pet, play }
+public enum BodyRegion: String, Codable, Equatable, Sendable { case head, back, sensitive, outside }
 
 /// Ownership begins only with a down inside the visible, explicitly opened care mat.
 /// Passive visuals never call this interpreter. Cancelled or foreign drags cannot begin ownership.

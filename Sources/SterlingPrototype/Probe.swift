@@ -91,23 +91,109 @@ extension AppDelegate {
       ?? false
     results["careOpaqueWindow"] = care?.isOpaque ?? false
     results["oneVisibleCat"] = !overlay.isVisible && care?.isVisible == true
+    await pendingOperation?.value
+    timer?.invalidate()
+    timer = nil
+
+    let pointerStart = ProcessInfo.processInfo.systemUptime
+    let generationBeforeBackground = interactionGeneration
+    careMat?.mode = .pet
+    careMat?.handlePointerDown(
+      point: CGPoint(x: 10, y: 10), timestamp: pointerStart, region: .outside)
+    let backgroundOnlyStayedLocal = careMat?.currentToken == nil
+      && interactionGeneration == generationBeforeBackground
+    careMat?.handlePointerDrag(
+      point: CGPoint(x: 26, y: 10), timestamp: pointerStart + 0.1, region: .head)
+    let pointerToken = careMat?.currentToken
+    let generationAfterBody = interactionGeneration
+    careMat?.handlePointerDrag(
+      point: CGPoint(x: 42, y: 10), timestamp: pointerStart + 0.2, region: .head)
+    let bodyTransitionMintedOnce = pointerToken != nil
+      && careMat?.currentToken == pointerToken
+      && generationAfterBody == generationBeforeBackground + 1
+      && interactionGeneration == generationAfterBody
+    await pendingOperation?.value
+
+    let freshPointerStep = careMat?.nextStep(
+      elapsedSeconds: 0.1, now: pointerStart + 0.3)
+    let expiredPointerStep = careMat?.nextStep(
+      elapsedSeconds: 0.1, now: pointerStart + 0.5)
+    let pointerQualityFresh: Bool
+    if case .some(.step(_, _, .pet(_, .some))) = freshPointerStep {
+      pointerQualityFresh = true
+    } else {
+      pointerQualityFresh = false
+    }
+    let pointerQualityExpired: Bool
+    if case .some(.step(_, _, .pet(_, .none))) = expiredPointerStep {
+      pointerQualityExpired = true
+    } else {
+      pointerQualityExpired = false
+    }
+    results["petBackgroundOnlyStayedLocal"] = backgroundOnlyStayedLocal
+    results["petBackgroundToBodyMintedOneToken"] = bodyTransitionMintedOnce
+    results["pointerPetQualityFreshBefore250ms"] = pointerQualityFresh
+    results["pointerPetQualityExpiredAfter250ms"] = pointerQualityExpired
+    careMat?.cancelGesture(reason: .cancelled)
+    await pendingOperation?.value
+
     _ = careMat?.handleKey(code: 49)
+    await pendingOperation?.value
+    let farFuture = ProcessInfo.processInfo.systemUptime + 10
+    let keyboardStep = careMat?.nextStep(elapsedSeconds: 0.1, now: farFuture)
+    let keyboardQualityPersists: Bool
+    if case .some(.step(_, _, .pet(_, .some(let quality)))) = keyboardStep {
+      keyboardQualityPersists = quality == 0.9
+    } else {
+      keyboardQualityPersists = false
+    }
+    results["keyboardPetQualityPersists"] = keyboardQualityPersists
+    let ingressBefore = timerIngressSubmissions
+    let interactionBefore = interactionStepSubmissions
+    let ordinaryBefore = ordinaryAdvanceSubmissions
+    let sequenceBeforeTimer = snapshot.acceptedRuntimeSequence
+    let activeSecondsBeforeTimer = snapshot.activeSeconds
+    startTimer()
     try? await Task.sleep(for: .seconds(1))
-    results["keyboardPetting"] = snapshot.activity == .petting
+    await pendingOperation?.value
+    let ingressDelta = timerIngressSubmissions - ingressBefore
+    let interactionDelta = interactionStepSubmissions - interactionBefore
+    let ordinaryDelta = ordinaryAdvanceSubmissions - ordinaryBefore
+    let acceptedSequenceDelta = snapshot.acceptedRuntimeSequence - sequenceBeforeTimer
+    let oneInteractionStepPerTimerIngress = ingressDelta > 0
+      && interactionDelta == ingressDelta && ordinaryDelta == 0
+      && acceptedSequenceDelta == UInt64(interactionDelta)
+      && snapshot.activeSeconds > activeSecondsBeforeTimer
+      && snapshot.interaction?.lastAcceptedOrdinal == careMat?.currentOrdinal
+    results["oneInteractionStepPerTimerIngress"] = oneInteractionStepPerTimerIngress
+    let keyboardPetting = snapshot.activity == .petting
+    results["keyboardPetting"] = keyboardPetting
+    timer?.invalidate()
+    timer = nil
     _ = careMat?.handleKey(code: 49)
-    try? await Task.sleep(for: .milliseconds(200))
-    results["keyboardStopsContact"] = !(careMat?.keyboardContact ?? true)
-    careMat?.cancelGesture()
+    await pendingOperation?.value
+    let keyboardStopsContact = !(careMat?.keyboardContact ?? true)
+    results["keyboardStopsContact"] = keyboardStopsContact
+    let oldTerminalResult = lastAppliedResult
     careMat?.mode = .play
     _ = careMat?.handleKey(code: 49)
+    await pendingOperation?.value
+    let newerToken = careMat?.currentToken
+    if let oldTerminalResult { consumeTerminalTokens(oldTerminalResult.terminals) }
+    let staleTerminalPreservedNewToken = newerToken != nil && careMat?.currentToken == newerToken
+    results["staleTerminalPreservedNewerHostToken"] = staleTerminalPreservedNewToken
+    startTimer()
     try? await Task.sleep(for: .milliseconds(300))
-    results["keyboardPlay"] = snapshot.activity == .playing && careMat?.keyboardContact == true
+    await pendingOperation?.value
+    let keyboardPlay = snapshot.activity == .playing && careMat?.keyboardContact == true
+    results["keyboardPlay"] = keyboardPlay
     _ = careMat?.handleKey(code: 49)
-    try? await Task.sleep(for: .milliseconds(200))
-    results["keyboardStopsPlay"] =
-      snapshot.activity != .playing && careMat?.keyboardContact == false
+    await pendingOperation?.value
+    let keyboardStopsPlay = snapshot.activity != .playing && careMat?.keyboardContact == false
+    results["keyboardStopsPlay"] = keyboardStopsPlay
     _ = careMat?.handleKey(code: 53)
-    results["escapeClosesCare"] = care == nil
+    let escapeClosesCare = care == nil
+    results["escapeClosesCare"] = escapeClosesCare
     await pendingOperation?.value
     apply(await runtime.send(.pause))
     suspendSession()
@@ -127,6 +213,11 @@ extension AppDelegate {
       && renderChecks.allSatisfy { $0["passed"] as? Bool == true }
       && careRenderCheck["passed"] as? Bool == true
     results["renderBoundsPassed"] = renderBoundsPassed
+    let sessionHandlerChecksPassed = backgroundOnlyStayedLocal && bodyTransitionMintedOnce
+      && pointerQualityFresh && pointerQualityExpired && keyboardQualityPersists
+      && oneInteractionStepPerTimerIngress && keyboardPetting && keyboardStopsContact
+      && staleTerminalPreservedNewToken && keyboardPlay && keyboardStopsPlay && escapeClosesCare
+    results["sessionHandlerChecksPassed"] = sessionHandlerChecksPassed
     if let path = argument("--output") {
       do {
         let data = try JSONSerialization.data(
@@ -135,7 +226,7 @@ extension AppDelegate {
       } catch { print("Probe receipt failed: \(error)") }
     }
     // This native check owns its failure exit; the shell probe also rejects nonzero exits.
-    if !renderBoundsPassed { exit(1) }
+    if !renderBoundsPassed || !sessionHandlerChecksPassed { exit(1) }
     NSApp.terminate(nil)
   }
 

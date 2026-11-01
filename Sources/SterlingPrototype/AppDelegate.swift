@@ -29,13 +29,18 @@ import SterlingCore
   var careStatus: NSTextField?
   var timer: Timer?
   var lastUptime = ProcessInfo.processInfo.systemUptime
-  var quality: Double?
-  var qualityTime = 0.0
   var pendingOperation: Task<Void, Never>?
   var updating = false
   var sessionSuspended = false
   var suspendedAt: Date?
   var isClosingCare = false
+  var careSessionCounter: UInt64 = 0
+  var interactionGeneration: UInt64 = 0
+  var currentCareSessionID: CareSessionID?
+  var timerIngressSubmissions = 0
+  var interactionStepSubmissions = 0
+  var ordinaryAdvanceSubmissions = 0
+  var lastAppliedResult: RuntimeResult?
   var observers: [NSObjectProtocol] = []
   let launchForeground = NSWorkspace.shared.frontmostApplication?.processIdentifier
   let isProbe = CommandLine.arguments.contains("--probe")
@@ -118,16 +123,18 @@ import SterlingCore
   }
   @objc func openCare() {
     guard !snapshot.policy.hidden else {
-      Task {
-        apply(await runtime.send(.resume))
-        openCare()
-      }
+      enqueue({ runtime in await runtime.send(.resume) }) { [weak self] in self?.openCare() }
       return
     }
     if let care {
       care.makeKeyAndOrderFront(nil)
       return
     }
+    guard careSessionCounter < UInt64.max else {
+      return
+    }
+    careSessionCounter += 1
+    let careSessionID = CareSessionID(rawValue: careSessionCounter)
     do {
       let panel = CarePanel(
         contentRect: NSRect(x: 0, y: 0, width: 560, height: 456),
@@ -152,11 +159,10 @@ import SterlingCore
       let mat = CareMat(frame: NSRect(x: 0, y: 0, width: 512, height: 258), device: nil)
       let renderer = try CatRenderer(view: mat, interactive: true)
       mat.catRenderer = renderer
-      mat.onCommand = { [weak self] in self?.send($0) }
-      mat.onQuality = { [weak self] q in
-        self?.quality = q
-        self?.qualityTime = ProcessInfo.processInfo.systemUptime
+      mat.onAcquire = { [weak self] mode, source in
+        self?.acquireInteraction(mode: mode, source: source)
       }
+      mat.onEnd = { [weak self] input in self?.accept(input) }
       mat.onDismiss = { [weak self] in self?.closeCare() }
       let status = NSTextField(wrappingLabelWithString: snapshot.notice)
       status.font = .systemFont(ofSize: 13)
@@ -192,22 +198,26 @@ import SterlingCore
       careMat = mat
       careRenderer = renderer
       careStatus = status
+      currentCareSessionID = careSessionID
       renderer.scene.snapshot = snapshot
       overlay.orderOut(nil)
       overlayView.isPaused = true
       panel.makeKeyAndOrderFront(nil)
       panel.makeFirstResponder(mat)
-    } catch { careStatus?.stringValue = "The care preview could not open. Try Show Sterling." }
+    } catch {
+      currentCareSessionID = nil
+      careStatus?.stringValue = "The care preview could not open. Try Show Sterling."
+    }
   }
   @objc func changeMode(_ sender: NSSegmentedControl) {
-    careMat?.cancelGesture()
+    careMat?.cancelGesture(reason: .modeChanged)
     careMat?.mode = sender.selectedSegment == 0 ? .pet : .play
     care?.makeFirstResponder(careMat)
   }
   @objc func closeCare() {
     guard !isClosingCare else { return }
     isClosingCare = true
-    careMat?.cancelGesture()
+    careMat?.cancelGesture(reason: .careClosed)
     careMat?.isPaused = true
     care?.orderOut(nil)
     care?.delegate = nil
@@ -216,6 +226,7 @@ import SterlingCore
     careMat = nil
     careRenderer = nil
     careStatus = nil
+    currentCareSessionID = nil
     if !snapshot.policy.hidden {
       overlay.orderFrontRegardless()
       overlayView.isPaused = snapshot.policy.paused
@@ -223,42 +234,82 @@ import SterlingCore
     isClosingCare = false
   }
   func windowWillClose(_ notification: Notification) { closeCare() }
-  func windowDidResignKey(_ notification: Notification) { careMat?.cancelGesture() }
+  func windowDidResignKey(_ notification: Notification) {
+    careMat?.cancelGesture(reason: .windowResignedKey)
+  }
   @objc func showSterling() {
+    careMat?.abandonLocalInputForOwnerPreemption()
     send(.resume)
     send(.settle)
     relocateOverlay()
   }
   @objc func hideSterling() {
-    careMat?.cancelGesture()
+    careMat?.abandonLocalInputForOwnerPreemption()
     send(.hide)
   }
   @objc func resumeSterling() { send(.resume) }
   @objc func togglePause() {
-    careMat?.cancelGesture()
-    send(snapshot.policy.paused ? .unpause : .pause)
+    if snapshot.policy.paused {
+      send(.unpause)
+    } else {
+      careMat?.abandonLocalInputForOwnerPreemption()
+      send(.pause)
+    }
   }
-  @objc func toggleFocus() { send(.setFocus(!snapshot.policy.focused)) }
+  @objc func toggleFocus() {
+    let focused = !snapshot.policy.focused
+    if focused { careMat?.abandonLocalInputForOwnerPreemption() }
+    send(.setFocus(focused))
+  }
   @objc func toggleMotion() { send(.setReducedMotion(!snapshot.policy.reducedMotion)) }
   @objc func feed() { send(.offerBasicFood) }
   @objc func settle() {
-    careMat?.cancelGesture()
+    careMat?.abandonLocalInputForOwnerPreemption()
     send(.settle)
   }
   @objc func quit() { NSApp.terminate(nil) }
+  func acquireInteraction(
+    mode: InteractionMode, source: InteractionSource
+  ) -> InteractionToken? {
+    guard let careSessionID = currentCareSessionID,
+      interactionGeneration < UInt64.max - 1
+    else { return nil }
+    interactionGeneration += 1
+    let token = InteractionToken(
+      careSessionID: careSessionID, generation: interactionGeneration)
+    accept(.begin(stamp: .init(token: token, sourceOrdinal: 0), mode: mode, source: source))
+    return token
+  }
+  func accept(_ input: InteractionInput) {
+    enqueue { runtime in await runtime.accept(input) }
+  }
   func send(_ command: SimulationCommand) {
     enqueue { runtime in await runtime.send(command) }
   }
   /// Preserve UI event order across actor suspension, including cancel then restart.
-  func enqueue(_ operation: @escaping @Sendable (SimulationRuntime) async -> SimulationSnapshot) {
+  func enqueue(
+    _ operation: @escaping @Sendable (SimulationRuntime) async -> RuntimeResult,
+    after: (@MainActor () -> Void)? = nil
+  ) {
     let previous = pendingOperation
     pendingOperation = Task {
       await previous?.value
       guard !Task.isCancelled else { return }
       apply(await operation(runtime))
+      after?()
     }
   }
-  func apply(_ updated: SimulationSnapshot) {
+  func consumeTerminalTokens(_ terminals: [InteractionTerminal]) {
+    guard let held = careMat?.currentToken else { return }
+    for terminal in terminals where terminal.token == held {
+      careMat?.clear(token: held)
+      return
+    }
+  }
+  func apply(_ result: RuntimeResult) {
+    lastAppliedResult = result
+    consumeTerminalTokens(result.terminals)
+    let updated = result.snapshot
     snapshot = updated
     overlayRenderer.scene.snapshot = updated
     careRenderer?.scene.snapshot = updated
@@ -274,7 +325,6 @@ import SterlingCore
       care?.orderOut(nil)
       timer?.invalidate()
       timer = nil
-      quality = nil
     } else {
       if let care {
         if !care.isVisible { care.orderFront(nil) }
@@ -286,7 +336,6 @@ import SterlingCore
       if updated.policy.paused {
         timer?.invalidate()
         timer = nil
-        quality = nil
       } else if timer == nil {
         startTimer()
       }
@@ -306,27 +355,37 @@ import SterlingCore
     timer?.tolerance = 0.01
   }
   func tick() {
-    guard !updating else { return }
+    guard !updating, !sessionSuspended else { return }
     updating = true
     let now = ProcessInfo.processInfo.systemUptime
-    let elapsed = max(0, now - lastUptime)
+    let elapsed = min(5, max(0, now - lastUptime))
     lastUptime = now
-    let q = (careMat?.keyboardContact == true || now - qualityTime < 0.25) ? quality : nil
-    let inputGeneration = careMat?.inputGeneration
+    guard elapsed > 0 else {
+      updating = false
+      return
+    }
+    let heldToken = careMat?.currentToken
+    let stepInput = careMat?.nextStep(elapsedSeconds: elapsed, now: now)
+    let operation: @Sendable (SimulationRuntime) async -> RuntimeResult
+    if let stepInput {
+      timerIngressSubmissions += 1
+      interactionStepSubmissions += 1
+      operation = { runtime in await runtime.accept(stepInput) }
+    } else if heldToken == nil {
+      timerIngressSubmissions += 1
+      ordinaryAdvanceSubmissions += 1
+      operation = { runtime in await runtime.advance(seconds: elapsed) }
+    } else {
+      // A local terminal is already queued or the ordinal is exhausted. Never add an anonymous step.
+      updating = false
+      return
+    }
     let previous = pendingOperation
     pendingOperation = Task {
       await previous?.value
       defer { updating = false }
       guard !Task.isCancelled, !sessionSuspended else { return }
-      let updated = await runtime.advance(seconds: elapsed, contactQuality: q)
-      apply(updated)
-      // A stale tick must not cancel a newer input gesture.
-      if inputGeneration == careMat?.inputGeneration,
-        updated.activity != .petting && updated.activity != .playing
-      {
-        quality = nil
-        careMat?.keyboardContact = false
-      }
+      apply(await operation(runtime))
     }
   }
   func relocateOverlay() {
@@ -344,7 +403,8 @@ import SterlingCore
         forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
       ) { [weak self] _ in
         MainActor.assumeIsolated {
-          self?.careMat?.cancelGesture()
+          self?.careMat?.abandonLocalInputForOwnerPreemption()
+          self?.enqueue { runtime in await runtime.lifecycle(.displayChanged) }
           self?.relocateOverlay()
         }
       })
@@ -362,7 +422,8 @@ import SterlingCore
         forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
       ) { [weak self] _ in
         MainActor.assumeIsolated {
-          self?.careMat?.cancelGesture()
+          self?.careMat?.abandonLocalInputForOwnerPreemption()
+          self?.enqueue { runtime in await runtime.lifecycle(.displayChanged) }
           self?.relocateOverlay()
         }
       })
@@ -390,7 +451,8 @@ import SterlingCore
     guard !sessionSuspended else { return }
     sessionSuspended = true
     suspendedAt = Date()
-    careMat?.cancelGesture()
+    careMat?.abandonLocalInputForOwnerPreemption()
+    enqueue { runtime in await runtime.lifecycle(.systemSuspended) }
     timer?.invalidate()
     timer = nil
     overlayView.isPaused = true
@@ -408,8 +470,9 @@ import SterlingCore
     timer?.invalidate()
     timer = nil
     pendingOperation?.cancel()
-    careMat?.onCommand = nil
-    careMat?.cancelGesture()
+    careMat?.onAcquire = nil
+    careMat?.onEnd = nil
+    careMat?.abandonLocalInputForOwnerPreemption()
     careMat?.isPaused = true
     overlayView?.isPaused = true
     for observer in observers {
