@@ -1,4 +1,5 @@
 import AppKit
+import MetalKit
 import SterlingCore
 
 extension AppDelegate {
@@ -36,16 +37,23 @@ extension AppDelegate {
       }
     }
     var displayChecks: [[String: Any]] = []
+    var renderChecks: [[String: Any]] = []
     for screen in NSScreen.screens {
       let v = screen.visibleFrame
       overlay.setFrameOrigin(NSPoint(x: max(v.minX, v.maxX - 540), y: v.minY + 12))
-      try? await Task.sleep(for: .milliseconds(200))
+      let rendered = await waitForRenderedFrames(
+        renderer: overlayRenderer, view: overlayView, scale: screen.backingScaleFactor)
       displayChecks.append([
         "expectedScale": screen.backingScaleFactor, "actualScale": overlay.backingScaleFactor,
         "withinVisibleBounds": v.contains(overlay.frame),
       ])
+      var renderCheck = renderBounds(renderer: overlayRenderer, view: overlayView)
+      renderCheck["renderedAfterTransition"] = rendered
+      renderCheck["passed"] = rendered && renderCheck["passed"] as? Bool == true
+      renderChecks.append(renderCheck)
     }
     results["displayPlacementChecks"] = displayChecks
+    results["displayRenderBoundsChecks"] = renderChecks
     relocateOverlay()
     apply(await runtime.send(.hide))
     try? await Task.sleep(for: .milliseconds(200))
@@ -63,7 +71,12 @@ extension AppDelegate {
     results["pausedFramesStopped"] = overlayRenderer.metrics.summary().frames == pausedStart
     apply(await runtime.send(.unpause))
     openCare()
-    try? await Task.sleep(for: .milliseconds(300))
+    let careRendered = await waitForRenderedFrames(
+      renderer: careRenderer, view: careMat, scale: care?.backingScaleFactor ?? 0)
+    var careRenderCheck = renderBounds(renderer: careRenderer, view: careMat)
+    careRenderCheck["renderedAfterTransition"] = careRendered
+    careRenderCheck["passed"] = careRendered && careRenderCheck["passed"] as? Bool == true
+    results["careRenderBoundsCheck"] = careRenderCheck
     if let path = argument("--care-preview") {
       do {
         try exportCarePreview(to: URL(fileURLWithPath: path))
@@ -110,6 +123,10 @@ extension AppDelegate {
     results["wakeResumesAvailableSession"] = !snapshot.policy.paused && timer != nil
     results["gpuMillisecondsP95"] = overlayRenderer.metrics.summary().p95GPU
     results["buildScope"] = "S0 harness and domain scaffold; no production acceptance claimed"
+    let renderBoundsPassed = !renderChecks.isEmpty
+      && renderChecks.allSatisfy { $0["passed"] as? Bool == true }
+      && careRenderCheck["passed"] as? Bool == true
+    results["renderBoundsPassed"] = renderBoundsPassed
     if let path = argument("--output") {
       do {
         let data = try JSONSerialization.data(
@@ -117,7 +134,55 @@ extension AppDelegate {
         try data.write(to: URL(fileURLWithPath: path), options: .atomic)
       } catch { print("Probe receipt failed: \(error)") }
     }
+    // This native check owns its failure exit; the shell probe also rejects nonzero exits.
+    if !renderBoundsPassed { exit(1) }
     NSApp.terminate(nil)
+  }
+
+  /// Wait for drawable conversion, then two completed frames; a fixed delay may inspect stale state.
+  private func waitForRenderedFrames(renderer: CatRenderer?, view: MTKView?, scale: CGFloat) async
+    -> Bool
+  {
+    guard let renderer, let view, scale > 0 else { return false }
+    var baseline: Int?
+    for _ in 0..<100 {
+      let drawableMatches = view.bounds.width > 0 && view.bounds.height > 0
+        && view.window?.backingScaleFactor == scale
+        && abs(view.drawableSize.width - view.bounds.width * scale) < 1
+        && abs(view.drawableSize.height - view.bounds.height * scale) < 1
+      if drawableMatches {
+        let frames = renderer.metrics.summary().frames
+        if let baseline {
+          if frames >= baseline + 2 { return true }
+        } else {
+          baseline = frames
+        }
+      } else {
+        baseline = nil
+      }
+      try? await Task.sleep(for: .milliseconds(20))
+    }
+    return false
+  }
+
+  /// Inspect only our scene and view. Window placement alone cannot detect clipped content.
+  private func renderBounds(renderer: CatRenderer?, view: MTKView?) -> [String: Any] {
+    guard let renderer, let view else { return ["passed": false] }
+    let scene = renderer.scene
+    let bounds = CGRect(origin: .zero, size: scene.size)
+    let cat = scene.cat.calculateAccumulatedFrame()
+    let decorationsFit = [scene.nook, scene.shadow].allSatisfy {
+      $0.isHidden || bounds.contains($0.calculateAccumulatedFrame())
+    }
+    let matchesView = scene.size == view.bounds.size
+    let contentFits = !cat.isEmpty && bounds.contains(cat) && decorationsFit
+    return [
+      "sceneWidth": scene.size.width, "sceneHeight": scene.size.height,
+      "viewWidth": view.bounds.width, "viewHeight": view.bounds.height,
+      "drawableWidth": view.drawableSize.width, "drawableHeight": view.drawableSize.height,
+      "sceneMatchesLogicalView": matchesView, "characterAndGroundFit": contentFits,
+      "passed": matchesView && contentFits,
+    ]
   }
   /// Draw only our own view hierarchy; insert our own scene bitmap because
   /// cacheDisplay cannot read a Metal drawable. This is not a desktop screenshot.

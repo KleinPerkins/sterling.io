@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>Sterling input-safety fixture</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+  body { max-width: 58rem; margin: 2rem auto; padding: 0 1.5rem 16rem; line-height: 1.5; }
+  h1 { font-size: 1.6rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; }
+  label { display: block; font-weight: 600; margin-bottom: .5rem; }
+  textarea { box-sizing: border-box; width: 100%; min-height: 8rem; padding: .75rem; font: inherit; }
+  .targets { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1rem 0; }
+  .target { min-width: 12rem; min-height: 6rem; padding: 1rem; font: inherit; }
+  #target-a { position: fixed; inset: auto 0 0; box-sizing: border-box; width: 100%; height: 210px; z-index: 1; border: 3px solid Highlight; }
+  output { font-weight: 700; font-variant-numeric: tabular-nums; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 3px solid Highlight; outline-offset: 3px; }
+  .selection { border: 1px solid GrayText; padding: 1rem; user-select: text; }
+  small { display: block; margin-top: 1rem; }
+</style>
+<main>
+  <h1>Sterling input-safety fixture</h1>
+  <p>A harmless local window for manual checks. Open this file in a browser and position
+    it beneath the passive cat. Keep the care window closed for passive checks.</p>
+  <p>This page has no network requests, storage, file writes or synthetic input.
+    Its text and counters disappear when reloaded. Use only made-up test text.</p>
+
+  <h2>Typing and focus</h2>
+  <label for="typing">Temporary typing area</label>
+  <textarea id="typing" spellcheck="false" autocomplete="off" placeholder="Type a harmless sentence repeatedly while Sterling appears or moves."></textarea>
+  <p>Characters currently in this area: <output id="characters" for="typing">0</output></p>
+
+  <h2>One click, one response</h2>
+  <p>Target A stays at the bottom of this browser window. Resize the window so its bottom
+    reaches the bottom of the usable desktop, with the cat above this strip; keep macOS
+    full-screen mode off. Click through the cat's body, then the empty margin beside it.
+    Record the count before and after each single physical click. Each should add exactly
+    one. Opening Care should require the paw menu. Target B is a comparison target.</p>
+  <div class="targets">
+    <button class="target" id="target-a" type="button">Target A — bottom-edge click strip<br>Clicks: <output id="count-a">0</output><br>Click through the cat's body, then beside it. Each click should add one.</button>
+    <button class="target" id="target-b" type="button">Target B<br>Clicks: <output id="count-b">0</output></button>
+  </div>
+
+  <h2>Foreign drag</h2>
+  <p>Start selecting this text in the browser, drag through the passive cat, and release
+    beyond it. Repeat in both directions. For the separate care-window check, start the
+    drag in this browser and enter the care mat while still holding the mouse button;
+    this foreign drag must not begin petting or play.</p>
+  <p class="selection">Sterling has a quiet place beside the window. This is disposable
+    selection text. Drag across these words, reverse direction, and cross the passive
+    cat without releasing the mouse button. The browser should retain the selection.
+    No real document, file operation or external action is involved.</p>
+
+  <button id="reset" type="button">Clear this fixture</button>
+  <small>Record observations in the guided session. These counters do not automatically
+    establish an FZ-01 pass, accessibility acceptance or product readiness.</small>
+</main>
+<script>
+  const typing = document.getElementById('typing');
+  const characters = document.getElementById('characters');
+  const counts = { a: 0, b: 0 };
+  typing.addEventListener('input', () => { characters.value = String(typing.value.length); });
+  for (const id of ['a', 'b']) {
+    document.getElementById(`target-${id}`).addEventListener('click', () => {
+      counts[id] += 1;
+      document.getElementById(`count-${id}`).value = String(counts[id]);
+    });
+  }
+  document.getElementById('reset').addEventListener('click', () => {
+    typing.value = '';
+    characters.value = '0';
+    for (const id of ['a', 'b']) {
+      counts[id] = 0;
+      document.getElementById(`count-${id}`).value = '0';
+    }
+  });
+</script>
+</html>

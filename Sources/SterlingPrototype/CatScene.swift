@@ -26,7 +26,9 @@ import SterlingCore
   override init(size: CGSize) {
     super.init(size: size)
     backgroundColor = .clear
-    scaleMode = .resizeFill
+    // The host owns logical point dimensions; Metal's viewport is in backing pixels.
+    // resizeFill lets SKRenderer overwrite this size on mixed-scale displays.
+    scaleMode = .aspectFit
     shadow.fillColor = .black.withAlphaComponent(0.13)
     shadow.strokeColor = .clear
     shadow.zPosition = -2
