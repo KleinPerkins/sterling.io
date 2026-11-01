@@ -16,7 +16,8 @@ public struct SimulationReplayIdentity: Codable, Equatable, Sendable {
 /// Synthetic, simulation-local input. No platform event, wall clock, or renderer is consulted.
 public enum SimulationReplayInput: Codable, Equatable, Sendable {
   case command(SimulationCommand)
-  case advance(seconds: Double, contactQuality: Double?)
+  case interaction(InteractionInput)
+  case advance(seconds: Double)
   case reconcileReturn(absenceSeconds: Double)
 }
 
@@ -40,12 +41,39 @@ public enum SimulationReplayError: Error, Equatable, Sendable {
   case invalidSequence(index: Int)
   case invalidTime(index: Int)
   case invalidQuality(index: Int)
+  case invalidInteraction(index: Int)
+}
+
+public struct SimulationReplayInteractionResult: Codable, Equatable, Sendable {
+  public let recordSequence: Int
+  public let disposition: RuntimeDisposition
+  public let runtimeSequence: UInt64?
+  public let terminals: [InteractionTerminal]
+
+  public init(recordSequence: Int, result: RuntimeResult) {
+    self.recordSequence = recordSequence
+    disposition = result.disposition
+    runtimeSequence = result.runtimeSequence
+    terminals = result.terminals
+  }
+}
+
+public struct SimulationReplayRunResult: Codable, Equatable, Sendable {
+  public let simulation: Simulation
+  public let interactionResults: [SimulationReplayInteractionResult]
+
+  public init(
+    simulation: Simulation, interactionResults: [SimulationReplayInteractionResult]
+  ) {
+    self.simulation = simulation
+    self.interactionResults = interactionResults
+  }
 }
 
 /// Bounded developer fixtures for the existing prototype reducer, not a production event bus.
 /// The exact step schedule is part of the fixture; cross-version/platform float identity is not promised.
 public struct SimulationReplay: Codable, Equatable, Sendable {
-  public static let currentSchemaVersion = 1
+  public static let currentSchemaVersion = 2
   public static let maximumRecords = 10_000
   public static let maximumActiveSeconds = 8.0 * 3_600
   public static let maximumBytes = 4 * 1_024 * 1_024
@@ -82,22 +110,33 @@ public struct SimulationReplay: Codable, Equatable, Sendable {
       guard record.sequence == index else { throw SimulationReplayError.invalidSequence(index: index) }
       switch record.input {
       case .command: break
-      case .advance(let seconds, let quality):
-        // Match the reducer's existing maximum input, instead of accepting its silent clamp.
+      case .advance(let seconds):
         guard seconds.isFinite, seconds > 0, seconds <= 5 else {
           throw SimulationReplayError.invalidTime(index: index)
         }
-        if let quality, !quality.isFinite || !(0...1).contains(quality) {
-          throw SimulationReplayError.invalidQuality(index: index)
-        }
         activeSeconds += seconds
-        guard activeSeconds <= Self.maximumActiveSeconds else {
-          throw SimulationReplayError.tooMuchActiveTime
+      case .interaction(let input):
+        if case .step(_, let seconds, let sample) = input {
+          guard seconds.isFinite, seconds > 0, seconds <= 5 else {
+            throw SimulationReplayError.invalidTime(index: index)
+          }
+          if case .pet(_, let quality) = sample, let quality,
+            !quality.isFinite || !(0...1).contains(quality)
+          {
+            throw SimulationReplayError.invalidQuality(index: index)
+          }
+          activeSeconds += seconds
+        }
+        guard input.isStructurallyValid else {
+          throw SimulationReplayError.invalidInteraction(index: index)
         }
       case .reconcileReturn(let seconds):
         guard seconds.isFinite, seconds >= 0 else {
           throw SimulationReplayError.invalidTime(index: index)
         }
+      }
+      guard activeSeconds <= Self.maximumActiveSeconds else {
+        throw SimulationReplayError.tooMuchActiveTime
       }
     }
   }
@@ -110,17 +149,28 @@ public struct SimulationReplay: Codable, Equatable, Sendable {
     return replay
   }
 
-  public func run(expectedIdentity: SimulationReplayIdentity) throws -> Simulation {
+  public func runWithResults(
+    expectedIdentity: SimulationReplayIdentity
+  ) throws -> SimulationReplayRunResult {
     try validate(expectedIdentity: expectedIdentity)
     var simulation = Simulation(seed: seed)
+    var interactionResults: [SimulationReplayInteractionResult] = []
+    interactionResults.reserveCapacity(records.count)
     for record in records {
       switch record.input {
-      case .command(let command): simulation.send(command)
-      case .advance(let seconds, let quality):
-        simulation.advance(seconds: seconds, contactQuality: quality)
-      case .reconcileReturn(let seconds): simulation.reconcileReturn(absenceSeconds: seconds)
+      case .command(let command): _ = simulation.send(command)
+      case .interaction(let input):
+        interactionResults.append(
+          .init(recordSequence: record.sequence, result: simulation.accept(input)))
+      case .advance(let seconds): _ = simulation.advance(seconds: seconds)
+      case .reconcileReturn(let seconds):
+        _ = simulation.reconcileReturn(absenceSeconds: seconds)
       }
     }
-    return simulation
+    return .init(simulation: simulation, interactionResults: interactionResults)
+  }
+
+  public func run(expectedIdentity: SimulationReplayIdentity) throws -> Simulation {
+    try runWithResults(expectedIdentity: expectedIdentity).simulation
   }
 }

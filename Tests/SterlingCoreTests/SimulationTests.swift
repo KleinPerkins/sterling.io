@@ -6,36 +6,40 @@ import Testing
 struct SimulationTests {
   @Test func testPettingRisesThenEndsAndRetainsSatisfaction() {
     var sim = Simulation()
-    sim.send(.startPet)
+    let firstPet = token(1)
+    sim.accept(begin(firstPet, mode: .pet))
     let initial = sim.character.receptiveness
-    for _ in 0..<100 { sim.advance(seconds: 0.1, contactQuality: 1) }
+    for ordinal in UInt64(1)...UInt64(100) { sim.accept(petStep(firstPet, ordinal)) }
     #expect(sim.character.receptiveness > initial)
-    for _ in 0..<1_400 { sim.advance(seconds: 0.1, contactQuality: 1) }
+    for ordinal in UInt64(101)...UInt64(1_500) { sim.accept(petStep(firstPet, ordinal)) }
     #expect(sim.activity != .petting)
     // Test restart immediately at the natural end, not after later recovery.
     var ending = Simulation()
-    ending.send(.startPet)
-    for _ in 0..<1_500 {
-      ending.advance(seconds: 0.1, contactQuality: 1)
+    let endingPet = token(1)
+    ending.accept(begin(endingPet, mode: .pet))
+    for ordinal in UInt64(1)...UInt64(1_500) {
+      ending.accept(petStep(endingPet, ordinal))
       if ending.activity != .petting { break }
     }
     let satisfaction = ending.character.contactSatisfaction
     #expect(satisfaction > 0.3)
-    ending.send(.startPet)
+    ending.accept(begin(token(2), mode: .pet))
     #expect(ending.character.contactSatisfaction == satisfaction)
     #expect(ending.activity != .petting)
   }
   @Test func testStillContactEndsWithoutAwardingSatisfaction() {
     var sim = Simulation()
-    sim.send(.startPet)
-    sim.advance(seconds: 3)
+    let pet = token(1)
+    sim.accept(begin(pet, mode: .pet))
+    sim.accept(petStep(pet, 1, seconds: 3, quality: nil))
     #expect(sim.activity != .petting)
     #expect(sim.character.contactSatisfaction == 0)
   }
   @Test func testSleepRecoveryPreservesControlsAndRecoversContact() {
     var sim = Simulation()
-    sim.send(.startPet)
-    for _ in 0..<100 { sim.advance(seconds: 0.1, contactQuality: 1) }
+    let pet = token(1)
+    sim.accept(begin(pet, mode: .pet))
+    for ordinal in UInt64(1)...UInt64(100) { sim.accept(petStep(pet, ordinal)) }
     sim.send(.hide)
     sim.send(.pause)
     let availability = sim.attention.availableSeconds
@@ -46,21 +50,23 @@ struct SimulationTests {
   }
   @Test func testBriefTouchDoesNotForceLongSession() {
     var sim = Simulation()
-    sim.send(.startPet)
-    sim.advance(seconds: 0.5, contactQuality: 0.9)
-    sim.send(.endContact)
+    let pet = token(1)
+    sim.accept(begin(pet, mode: .pet))
+    sim.accept(petStep(pet, 1, seconds: 0.5, quality: 0.9))
+    sim.accept(end(pet, 2))
     #expect(sim.activity == .settling)
     #expect(sim.character.contactSatisfaction < 0.01)
   }
   @Test func testToyReentryDoesNotResetBoredomOrEnergy() {
     var sim = Simulation()
-    sim.send(.startPlay)
+    let firstPlay = token(1)
+    sim.accept(begin(firstPlay, mode: .play))
     let before = sim.toy.interest(character: sim.character)
-    for _ in 0..<1_500 { sim.advance(seconds: 0.1) }
+    for ordinal in UInt64(1)...UInt64(1_500) { sim.accept(playStep(firstPlay, ordinal)) }
     let boredom = sim.toy.boredom
     let energy = sim.character.energy
-    sim.send(.stopInteraction)
-    sim.send(.startPlay)
+    sim.accept(end(firstPlay, 1_501))
+    sim.accept(begin(token(2), mode: .play))
     #expect(sim.toy.boredom == boredom)
     #expect(sim.character.energy == energy)
     #expect(sim.toy.interest(character: sim.character) < before - 0.25)
@@ -70,12 +76,20 @@ struct SimulationTests {
       var sim = Simulation()
       sim.send(command)
       let before = sim
-      for _ in 0..<100 { sim.advance(seconds: 5, contactQuality: 1) }
+      for _ in 0..<100 { sim.advance(seconds: 5) }
       #expect(sim == before)
-      sim.send(.startPet)
-      sim.send(.startPlay)
+      let unavailable = sim.accept(begin(token(1), mode: .pet))
+      #expect(unavailable.terminals.first?.reason == .policyUnavailable)
+      #expect(sim.character == before.character)
+      #expect(sim.toy == before.toy)
+      #expect(sim.activeSeconds == before.activeSeconds)
+      let afterUnavailable = sim
+      #expect(sim.accept(petStep(token(1), 1)).disposition == .ignored(.postTerminal(.policyUnavailable)))
+      #expect(sim == afterUnavailable)
       sim.send(.offerBasicFood)
-      #expect(sim == before)
+      #expect(sim.character == before.character)
+      #expect(sim.toy == before.toy)
+      #expect(sim.activeSeconds == before.activeSeconds)
     }
   }
   @Test func testQuietAndFocusNeverMakeBudgetAvailable() {
@@ -168,8 +182,11 @@ struct SimulationTests {
   }
   @Test func testLongAbsencePreservesFamiliarityAndComfort() {
     var sim = Simulation()
-    sim.send(.startPlay)
-    for _ in 0..<100 { sim.advance(seconds: 1) }
+    let play = token(1)
+    sim.accept(begin(play, mode: .play))
+    for ordinal in UInt64(1)...UInt64(100) {
+      sim.accept(playStep(play, ordinal, seconds: 1))
+    }
     let familiarity = sim.character.familiarity
     sim.reconcileReturn(absenceSeconds: 30 * 24 * 3_600)
     #expect(sim.character.familiarity == familiarity)
@@ -195,11 +212,14 @@ struct SimulationTests {
     var b = Simulation(seed: 123)
     for i in 0..<10_000 {
       if i % 1_000 == 0 {
-        a.send(.startPlay)
-        b.send(.startPlay)
+        let play = token(UInt64(i / 1_000 + 1))
+        a.accept(begin(play, mode: .play))
+        b.accept(begin(play, mode: .play))
       }
-      a.advance(seconds: 0.1)
-      b.advance(seconds: 0.1)
+      let play = token(UInt64(i / 1_000 + 1))
+      let ordinal = UInt64(i % 1_000 + 1)
+      a.accept(playStep(play, ordinal))
+      b.accept(playStep(play, ordinal))
     }
     #expect(a == b)
     let decoded = try JSONDecoder().decode(Simulation.self, from: JSONEncoder().encode(a))
@@ -212,16 +232,30 @@ struct SimulationTests {
     sim.advance(seconds: .infinity)
     sim.advance(seconds: -10)
     #expect(sim == original)
-    sim.send(.startPet)
-    sim.advance(seconds: 1, contactQuality: .nan)
-    #expect(sim.character.receptiveness.isFinite)
+    let pet = token(1)
+    sim.accept(begin(pet, mode: .pet))
+    let beforeInvalidQuality = sim
+    #expect(sim.accept(petStep(pet, 1, seconds: 1, quality: .nan)).disposition == .ignored(.invalidPayload))
+    #expect(sim == beforeInvalidQuality)
   }
   @Test func testStateBoundsUnderAlternatingCommands() {
     var sim = Simulation(seed: 7)
     for i in 0..<40_000 {
-      if i % 500 == 0 { sim.send(i % 1_000 == 0 ? .startPet : .startPlay) }
+      if i % 500 == 0 {
+        sim.accept(
+          begin(
+            token(UInt64(i / 500 + 1)), mode: i % 1_000 == 0 ? .pet : .play))
+      }
       if i % 3_000 == 0 { sim.send(.offerBasicFood) }
-      sim.advance(seconds: 0.1, contactQuality: i % 2 == 0 ? 1 : 0.1)
+      if let session = sim.snapshot.interaction {
+        let ordinal = session.lastAcceptedOrdinal + 1
+        sim.accept(
+          session.mode == .pet
+            ? petStep(session.token, ordinal, quality: i % 2 == 0 ? 1 : 0.1)
+            : playStep(session.token, ordinal))
+      } else {
+        sim.advance(seconds: 0.1)
+      }
       let c = sim.character
       for x in [
         c.hunger, c.satiety, c.energy, c.sleepPressure, c.socialAppetite, c.contactDesire,

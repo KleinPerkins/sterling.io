@@ -7,10 +7,12 @@ public struct SimulationSnapshot: Codable, Equatable, Sendable {
   public var policy: ControlPolicy
   public var activeSeconds: Double
   public var notice: String
+  public var interaction: InteractionSessionSnapshot?
+  public var acceptedRuntimeSequence: UInt64
 }
 
 public enum SimulationCommand: Codable, Equatable, Sendable {
-  case startPet, endContact, startPlay, stopInteraction, offerBasicFood, settle
+  case offerBasicFood, settle
   case hide, resume, pause, unpause
   case setQuiet(Bool)
   case setFocus(Bool)
@@ -26,6 +28,10 @@ public struct Simulation: Codable, Equatable, Sendable {
   public private(set) var attention = AttentionBudget()
   public private(set) var random: SeededRandom
   public private(set) var notice = "Quiet company."
+  public private(set) var highestAcceptedInteractionGeneration: UInt64 = 0
+  public private(set) var acceptedRuntimeSequence: UInt64 = 0
+  public private(set) var lastInteractionTerminal: InteractionTerminal?
+  private var activeInteraction: InteractionSession?
   private var phaseRemaining = 8.0
   private var contactElapsed = 0.0
   private var idleContactSeconds = 0.0
@@ -36,11 +42,35 @@ public struct Simulation: Codable, Equatable, Sendable {
   private var mealClock = 0.0
 
   public init(seed: UInt64 = 0x57E211) { random = SeededRandom(seed: seed) }
+
   public var snapshot: SimulationSnapshot {
     .init(
       character: character, toy: toy, activity: activity, policy: policy,
-      activeSeconds: activeSeconds, notice: notice)
+      activeSeconds: activeSeconds, notice: notice, interaction: activeInteraction?.snapshot,
+      acceptedRuntimeSequence: acceptedRuntimeSequence)
   }
+
+  private func result(
+    _ disposition: RuntimeDisposition, sequence: UInt64? = nil,
+    terminals: [InteractionTerminal] = []
+  ) -> RuntimeResult {
+    .init(
+      snapshot: snapshot, disposition: disposition, runtimeSequence: sequence,
+      terminals: terminals)
+  }
+
+  private func ignored(_ reason: InteractionIgnoreReason) -> RuntimeResult {
+    result(.ignored(reason))
+  }
+
+  private var canAcceptRuntimeInput: Bool { acceptedRuntimeSequence < UInt64.max }
+
+  @discardableResult private mutating func commitRuntimeSequence() -> UInt64 {
+    precondition(canAcceptRuntimeInput)
+    acceptedRuntimeSequence += 1
+    return acceptedRuntimeSequence
+  }
+
   private mutating func stopContact() {
     contactElapsed = 0
     idleContactSeconds = 0
@@ -48,12 +78,176 @@ public struct Simulation: Codable, Equatable, Sendable {
     activity = .settling
     phaseRemaining = 3
   }
-  public mutating func send(_ command: SimulationCommand) {
-    let wasAvailable = policy.allowsAttention
-    defer {
-      // Only a real return to availability starts grace; repeated controls cannot extend it.
-      if !wasAvailable && policy.allowsAttention { attention.resumeGrace() }
+
+  private mutating func terminalizeActive(
+    reason: InteractionTerminalReason, finalOrdinal: UInt64? = nil
+  ) -> InteractionTerminal? {
+    guard let session = activeInteraction else { return nil }
+    let terminal = InteractionTerminal(
+      token: session.token, finalOrdinal: finalOrdinal ?? session.lastAcceptedOrdinal,
+      reason: reason)
+    activeInteraction = nil
+    lastInteractionTerminal = terminal
+    if activity == .petting || activity == .playing { stopContact() }
+    return terminal
+  }
+
+  private mutating func recordTerminal(
+    token: InteractionToken, finalOrdinal: UInt64, reason: InteractionTerminalReason
+  ) -> InteractionTerminal {
+    let terminal = InteractionTerminal(
+      token: token, finalOrdinal: finalOrdinal, reason: reason)
+    lastInteractionTerminal = terminal
+    return terminal
+  }
+
+  private func validate(_ input: InteractionInput) -> InteractionIgnoreReason? {
+    guard input.isStructurallyValid else { return .invalidPayload }
+    let stamp = input.stamp
+    let token = stamp.token
+
+    if token.generation > highestAcceptedInteractionGeneration {
+      if case .begin = input { return nil }
+      return .beginRequired(current: highestAcceptedInteractionGeneration)
     }
+    if token.generation < highestAcceptedInteractionGeneration {
+      return .staleGeneration(current: highestAcceptedInteractionGeneration)
+    }
+
+    let currentToken = activeInteraction?.token ?? lastInteractionTerminal?.token
+    guard currentToken?.careSessionID == token.careSessionID else { return .foreignSession }
+    if let terminal = lastInteractionTerminal, terminal.token == token,
+      activeInteraction?.token != token
+    {
+      return .postTerminal(terminal.reason)
+    }
+    guard let session = activeInteraction, session.token == token else { return .foreignSession }
+    guard stamp.sourceOrdinal > session.lastAcceptedOrdinal else {
+      return .duplicateOrOutOfOrder(lastAccepted: session.lastAcceptedOrdinal)
+    }
+    if case .step(_, _, let sample) = input {
+      switch (session.mode, sample) {
+      case (.pet, .pet), (.play, .play): break
+      case (.pet, .play): return .modeMismatch(expected: .pet)
+      case (.play, .pet): return .modeMismatch(expected: .play)
+      }
+    }
+    return nil
+  }
+
+  @discardableResult public mutating func accept(_ input: InteractionInput) -> RuntimeResult {
+    if let reason = validate(input) { return ignored(reason) }
+    guard canAcceptRuntimeInput else { return ignored(.invalidPayload) }
+
+    var terminals: [InteractionTerminal] = []
+    switch input {
+    case .begin(let stamp, let mode, let source):
+      if let previous = terminalizeActive(reason: .supersededGeneration) {
+        terminals.append(previous)
+      }
+      highestAcceptedInteractionGeneration = stamp.token.generation
+
+      guard policy.advancesNeeds else {
+        terminals.append(
+          recordTerminal(
+            token: stamp.token, finalOrdinal: stamp.sourceOrdinal, reason: .policyUnavailable))
+        let sequence = commitRuntimeSequence()
+        return result(.accepted, sequence: sequence, terminals: terminals)
+      }
+
+      switch mode {
+      case .pet:
+        guard character.receptiveness >= 0.20 else {
+          notice = "He turns gently away. A little space feels good."
+          terminals.append(
+            recordTerminal(
+              token: stamp.token, finalOrdinal: stamp.sourceOrdinal, reason: .declined))
+          let sequence = commitRuntimeSequence()
+          return result(.accepted, sequence: sequence, terminals: terminals)
+        }
+        activity = .petting
+        contactElapsed = 0
+        idleContactSeconds = 0
+        lowReceptivenessSeconds = 0
+        notice = "He turns toward your touch."
+      case .play:
+        guard toy.interest(character: character) >= 0.35, character.energy >= 0.25 else {
+          notice = "He watches the toy, then looks away."
+          terminals.append(
+            recordTerminal(
+              token: stamp.token, finalOrdinal: stamp.sourceOrdinal, reason: .declined))
+          let sequence = commitRuntimeSequence()
+          return result(.accepted, sequence: sequence, terminals: terminals)
+        }
+        activity = .playing
+        playElapsed = 0
+        lowInterestSeconds = 0
+        notice = "Something worth watching."
+      }
+      activeInteraction = InteractionSession(
+        token: stamp.token, mode: mode, source: source,
+        lastAcceptedOrdinal: stamp.sourceOrdinal)
+
+    case .step(let stamp, let elapsedSeconds, let sample):
+      guard var session = activeInteraction else { return ignored(.foreignSession) }
+      session.lastAcceptedOrdinal = stamp.sourceOrdinal
+      activeInteraction = session
+      switch sample {
+      case .pet(_, let quality): reduceAdvance(seconds: elapsedSeconds, contactQuality: quality)
+      case .play: reduceAdvance(seconds: elapsedSeconds, contactQuality: nil)
+      }
+      let stillInMode =
+        (session.mode == .pet && activity == .petting)
+        || (session.mode == .play && activity == .playing)
+      if !stillInMode,
+        let terminal = terminalizeActive(
+          reason: .naturalBoundary, finalOrdinal: stamp.sourceOrdinal)
+      {
+        terminals.append(terminal)
+      }
+
+    case .end(let stamp, let reason):
+      guard var session = activeInteraction else { return ignored(.foreignSession) }
+      session.lastAcceptedOrdinal = stamp.sourceOrdinal
+      activeInteraction = session
+      if let terminal = terminalizeActive(
+        reason: .input(reason), finalOrdinal: stamp.sourceOrdinal)
+      {
+        terminals.append(terminal)
+      }
+      notice = "A little pause."
+    }
+
+    let sequence = commitRuntimeSequence()
+    return result(.accepted, sequence: sequence, terminals: terminals)
+  }
+
+  @discardableResult public mutating func send(_ command: SimulationCommand) -> RuntimeResult {
+    guard canAcceptRuntimeInput else { return ignored(.invalidPayload) }
+    let wasAvailable = policy.allowsAttention
+    let focusEntered: Bool
+    if case .setFocus(let focused) = command {
+      focusEntered = focused && !policy.focused
+    } else {
+      focusEntered = false
+    }
+    let foodWillReplace = command == .offerBasicFood && policy.advancesNeeds
+      && activity != .eating && character.hunger >= 0.20 && character.satiety < 0.80
+
+    var terminals: [InteractionTerminal] = []
+    let terminalReason: InteractionTerminalReason?
+    switch command {
+    case .hide: terminalReason = .hidden
+    case .pause: terminalReason = .paused
+    case .settle: terminalReason = .settledByOwner
+    case .setFocus where focusEntered: terminalReason = .focusStarted
+    case .offerBasicFood where foodWillReplace: terminalReason = .supersededByFood
+    default: terminalReason = nil
+    }
+    if let terminalReason, let terminal = terminalizeActive(reason: terminalReason) {
+      terminals.append(terminal)
+    }
+
     switch command {
     case .hide:
       policy.hidden = true
@@ -72,7 +266,7 @@ public struct Simulation: Codable, Equatable, Sendable {
     case .setQuiet(let quiet): policy.quiet = quiet
     case .setFocus(let focused):
       policy.focused = focused
-      if focused {
+      if focusEntered {
         stopContact()
         notice = "Settling nearby while you focus."
       }
@@ -80,51 +274,34 @@ public struct Simulation: Codable, Equatable, Sendable {
     case .settle:
       stopContact()
       notice = "Settling in his nook."
-    case .endContact, .stopInteraction:
-      if activity == .petting || activity == .playing {
-        stopContact()
-        notice = "A little pause."
-      }
-    case .startPet:
-      guard policy.advancesNeeds else { return }
-      guard activity != .petting else { return }
-      guard character.receptiveness >= 0.20 else {
-        notice = "He turns gently away. A little space feels good."
-        return
-      }
-      activity = .petting
-      contactElapsed = 0
-      idleContactSeconds = 0
-      lowReceptivenessSeconds = 0
-      notice = "He turns toward your touch."
-    case .startPlay:
-      guard policy.advancesNeeds, activity != .playing else { return }
-      guard toy.interest(character: character) >= 0.35, character.energy >= 0.25 else {
-        notice = "He watches the toy, then looks away."
-        return
-      }
-      activity = .playing
-      playElapsed = 0
-      lowInterestSeconds = 0
-      notice = "Something worth watching."
     case .offerBasicFood:
-      guard policy.advancesNeeds, activity != .eating else { return }
-      guard character.hunger >= 0.20, character.satiety < 0.80 else {
+      if foodWillReplace {
+        activity = .eating
+        mealFraction = 0
+        mealClock = 0
+        notice = "A sniff, then a small bite."
+      } else if policy.advancesNeeds, activity != .eating {
         notice = "A sniff, then a contented look away."
-        return
       }
-      activity = .eating
-      mealFraction = 0
-      mealClock = 0
-      notice = "A sniff, then a small bite."
     }
+    if !wasAvailable && policy.allowsAttention { attention.resumeGrace() }
+    let sequence = commitRuntimeSequence()
+    return result(.accepted, sequence: sequence, terminals: terminals)
   }
 
-  /// Fixed-step reducer. Rendering never calls this method or awards effects.
-  public mutating func advance(seconds: Double, contactQuality: Double? = nil) {
-    guard seconds.isFinite, seconds > 0, policy.advancesNeeds else { return }
-    // The caller reports bounded monotonic time; huge gaps use reconcileReturn.
-    var remaining = min(seconds, 5)
+  /// Ordinary autonomous time. An owned interaction must use tokenized `InteractionInput.step`.
+  @discardableResult public mutating func advance(seconds: Double) -> RuntimeResult {
+    guard seconds.isFinite, seconds > 0, seconds <= 5 else { return ignored(.invalidPayload) }
+    guard activeInteraction == nil else { return ignored(.interactionTokenRequired) }
+    guard policy.advancesNeeds else { return ignored(.invalidPayload) }
+    guard canAcceptRuntimeInput else { return ignored(.invalidPayload) }
+    reduceAdvance(seconds: seconds, contactQuality: nil)
+    let sequence = commitRuntimeSequence()
+    return result(.accepted, sequence: sequence)
+  }
+
+  private mutating func reduceAdvance(seconds: Double, contactQuality: Double?) {
+    var remaining = seconds
     while remaining > 0.000_001 {
       let dt = min(0.1, remaining)
       step(dt, contactQuality: contactQuality)
@@ -146,8 +323,8 @@ public struct Simulation: Codable, Equatable, Sendable {
     }
 
     if activity == .petting { contactElapsed += dt }
-    if activity == .petting, let rawQuality = contactQuality, rawQuality.isFinite {
-      let q = unit(rawQuality)
+    if activity == .petting, let quality = contactQuality {
+      let q = quality
       let d = character.contactDesire
       let z = character.contactSatisfaction
       let o = character.overstimulation
@@ -185,7 +362,7 @@ public struct Simulation: Codable, Equatable, Sendable {
       character.sleepPressure += dt * 0.0004
       character.playMotivation -= dt * 0.002
       character.arousal += dt * 0.006
-      character.overstimulation += dt * 0.009  // Counteracts quiet recovery above, net +0.001.
+      character.overstimulation += dt * 0.009
       toy.boredom = unit(toy.boredom + dt * 0.004)
       toy.novelty = max(0.05, toy.novelty - dt * 0.002)
       let interest = toy.interest(character: character)
@@ -241,7 +418,20 @@ public struct Simulation: Codable, Equatable, Sendable {
     }
   }
 
-  public mutating func reconcileReturn(absenceSeconds: Double) {
+  @discardableResult public mutating func lifecycle(_ input: RuntimeLifecycleInput) -> RuntimeResult {
+    guard canAcceptRuntimeInput else { return ignored(.invalidPayload) }
+    var terminals: [InteractionTerminal] = []
+    let reason: InteractionTerminalReason =
+      input == .displayChanged ? .displayChanged : .systemSuspended
+    if let terminal = terminalizeActive(reason: reason) { terminals.append(terminal) }
+    let sequence = commitRuntimeSequence()
+    return result(.accepted, sequence: sequence, terminals: terminals)
+  }
+
+  @discardableResult public mutating func reconcileReturn(absenceSeconds: Double) -> RuntimeResult {
+    guard canAcceptRuntimeInput else { return ignored(.invalidPayload) }
+    var terminals: [InteractionTerminal] = []
+    if let terminal = terminalizeActive(reason: .systemSuspended) { terminals.append(terminal) }
     let elapsed = absenceSeconds.isFinite ? max(0, absenceSeconds) : 0
     if elapsed >= 1_800 {
       character.hunger = min(0.45, max(0.20, character.hunger))
@@ -264,23 +454,29 @@ public struct Simulation: Codable, Equatable, Sendable {
     stopContact()
     attention.resumeGrace()
     notice = "Back in his nook."
+    let sequence = commitRuntimeSequence()
+    return result(.accepted, sequence: sequence, terminals: terminals)
   }
 }
 
 public actor SimulationRuntime {
   private var simulation: Simulation
+
   public init(simulation: Simulation = Simulation()) { self.simulation = simulation }
-  public func send(_ command: SimulationCommand) -> SimulationSnapshot {
-    simulation.send(command)
-    return simulation.snapshot
+
+  public func accept(_ input: InteractionInput) -> RuntimeResult { simulation.accept(input) }
+
+  public func send(_ command: SimulationCommand) -> RuntimeResult { simulation.send(command) }
+
+  public func lifecycle(_ input: RuntimeLifecycleInput) -> RuntimeResult {
+    simulation.lifecycle(input)
   }
-  public func advance(seconds: Double, contactQuality: Double?) -> SimulationSnapshot {
-    simulation.advance(seconds: seconds, contactQuality: contactQuality)
-    return simulation.snapshot
-  }
-  public func reconcileReturn(absenceSeconds: Double) -> SimulationSnapshot {
+
+  public func advance(seconds: Double) -> RuntimeResult { simulation.advance(seconds: seconds) }
+
+  public func reconcileReturn(absenceSeconds: Double) -> RuntimeResult {
     simulation.reconcileReturn(absenceSeconds: absenceSeconds)
-    return simulation.snapshot
   }
+
   public func snapshot() -> SimulationSnapshot { simulation.snapshot }
 }
