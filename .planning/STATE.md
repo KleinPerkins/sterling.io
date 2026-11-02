@@ -1,7 +1,7 @@
 # Authoring state
 
 - Repository key: `01b2bbbc-da9d-4602-ac03-ccfd6b484f11`.
-- Observed main: `c3fac149f1dbf09719fba3e216178fb3aa6d8335`; PRs #7/#8/#9/#10/#11 merged. This observation does not reset or pin future work to that revision.
+- Observed main: `c7becaebed14b5ebcc19871f4490ba4343641108`; PRs #7/#8/#9/#10/#11/#12 merged. This observation does not reset or pin future work to that revision.
 - S0 feasibility remains active and incomplete; no production S1, likeness, accessibility, platform or release acceptance.
 - Canonical PRD v1 remains approved and frozen at its existing identity and bytes.
 - Four foundation deliverables remain drafts. **FND-01 is implemented, locally/hosted tested and merged in PR #9**: bounded deterministic replay and attention-resume grace. [Dated delivery evidence](../docs/evidence/2026-10-31-foundation/verification.md).
@@ -11,7 +11,9 @@
 - Maintenance run 41169009251 passed with no eligible dependency PRs. Live dependency refresh/merge remains unobserved; do not manufacture a test upgrade.
 - Release-please PR #5 remains owner-controlled. Protected release environment approval remains required. No product release is authorized here.
 - S0-INPUT session kit and S0-ART reference packet are prepared; the mixed-scale clipping repair is merged in PR #11. Current-build checks and user-reported physical observations are recorded in the [dated session evidence](../docs/evidence/2026-11-01-s0-input/verification.md). FZ-01 remains open.
-- Next actions: complete remaining physical trials; supply real Sterling references; execute S1-CORE-01 only under its separately applied exact plan acceptance. Production S1 and phase acceptance remain gated.
+- **S1-CORE-01 is implemented, verified and merged in PR #12** under its separately accepted bounded plan. [Fresh-Mac and delivery reconciliation](../docs/evidence/2026-11-02-new-mac/verification.md) preserves its exact source identities and the later old-binary INP-02 report. This is not production S1 acceptance.
+- Fresh-Mac full verification, local build, own-app probe and matching preview package passed. Destination physical trials remain not run. Real reference images/video candidates were privately recovered; identity/likeness approval remains open, and characteristics are deferred until after reference study.
+- Next actions: review the recovered reference material and complete fresh-binary S0-INPUT physical trials. Production S1 and phase acceptance remain gated.
 
 - [Requirements, behaviors and founder decisions](artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-2615167b-a644-5ad8-94d8-f819d7b9de84-v1.md): 48 requirements, 72 behaviors and interaction-state contracts.
 - [System and product design architecture](artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-b6153447-65a9-5ba9-b5b3-e11b350ddc5b-v1.md): runtime boundaries, native care/settings, art pipeline and open gates.
