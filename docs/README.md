@@ -49,3 +49,7 @@ These artifacts prepare implementation; they do not change PRD acceptance or clo
 - [2026-11-01 current-build and physical observations](evidence/2026-11-01-s0-input/verification.md): exact binary, automated limits and reported trials; FZ-01 remains open.
 - [S0-ART reference and review packet](../.planning/artifacts/SPEC-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-1631e1e8-47c9-50da-a0a8-d6f02d7b9358-v1.md): draft; Sterling-specific appearance and traits need founder sources.
 - [S1-CORE-01 bounded execution plan](../.planning/artifacts/PLAN-01b2bbbc-da9d-4602-ac03-ccfd6b484f11-da9fcfab-7cac-52f4-8116-3417caf72551-v1.md): exact plan acceptance is separate from these draft/evidence records; production S1 remains gated.
+
+## Destination continuation
+
+[2026-11-02: fresh-Mac qualification and delivery reconciliation](evidence/2026-11-02-new-mac/verification.md) records the new binary, completed PR #12 scope, additive historical input observation and remaining physical/art gates. Private recovered media remains outside this public repository.
