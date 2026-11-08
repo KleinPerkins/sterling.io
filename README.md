@@ -47,15 +47,15 @@ Generated builds, caches, app bundles, current-run logs and preview archives sta
 
 This is `KleinPerkins/sterling.io`, distinct from the existing `KleinPerkins/sterling` project. The canonical personal checkout is `~/dev/personal/sterling.io`; active source work follows the native worktree rule. Use local `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity and the installed session, identity and data guards.
 
-The repository retains doc-warden v2 governance. The owner has selected native GitHub Actions and hosted runners for public delivery, with App-controlled ordinary PR auto-merge and manual release approval. See [release and setup runbook](docs/runbooks/releasing.md) for activation, signing credentials, required checks and rollback. Workflow files alone do not prove that GitHub settings or credentials are configured. The private SECURITY template is replaced by a reviewed repository-specific policy; the global private baseline is unchanged.
+The repository retains doc-warden v2 governance. The owner has selected native GitHub Actions and hosted runners for this public source repository, with App-controlled ordinary PR auto-merge and manual release approval. See [release and setup runbook](docs/runbooks/releasing.md) for activation, signing credentials, required checks and rollback. Workflow files alone do not prove that GitHub settings or credentials are configured. The private SECURITY template is replaced by a reviewed repository-specific policy; the global private baseline is unchanged.
 
 Use small reviewable branches and PRs (draft while incomplete), verify their exact source, and follow the currently effective owner merge policy. A pushed branch is source-controlled work, not proof of merge, release or UAT acceptance. Preserve approved documents; changes use reviewed successor versions.
 
 ## Signed releases and updates
 
-Distribution builds use your configured Developer ID Application identity, hardened runtime and Apple notarization, with a separate Sterling Sparkle signature for update archives. Release PRs are manually merged; signing and publication wait for owner approval in GitHub's `release` environment. The workflow verifies the public update feed before making the release Latest.
+Distribution builds use your configured Developer ID Application identity, hardened runtime and Apple notarization, with a separate Sterling Sparkle signature for update archives. Release PRs are manually merged; signing and publication wait for owner approval in GitHub's `release` environment. The owner selected private downloads and update delivery while keeping source public. The public binary/feed publisher is blocked before signing, packaging or publication until a centrally governed private delivery profile is qualified. See the [release runbook](docs/runbooks/releasing.md#private-distribution-migration) for the current boundary.
 
-Local feasibility bundles are ad-hoc signed and never start the updater. Signed distribution builds offer **Check for Updates…** and an opt-in **Check for Updates Automatically** menu item. Automatic installation is disabled. Pipeline implementation is not external beta or product release approval.
+Local feasibility bundles are ad-hoc signed and never start the updater. The updater implementation includes **Check for Updates…** and an opt-in **Check for Updates Automatically** menu item; private recipient access and an installed update are still unverified. Automatic installation is disabled. Pipeline implementation is not external beta or product release approval.
 
 ## Production foundation
 

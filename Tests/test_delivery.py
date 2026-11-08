@@ -19,6 +19,13 @@ release = module('release', 'release.py')
 merge = module('auto_merge', 'auto-merge.py')
 
 class ReleaseTests(unittest.TestCase):
+    def setUp(self):
+        # Retain coverage of dormant legacy integrity/recovery helpers. Actual
+        # production entrypoints must refuse in test_private_distribution.py.
+        guard = patch.object(release, 'distribution_preflight', return_value=None)
+        guard.start()
+        self.addCleanup(guard.stop)
+
     def feed(self):
         return f'''<rss xmlns:sparkle="{release.NS[1:-1]}"><channel><item>
         <sparkle:version>1.2.3</sparkle:version><sparkle:minimumSystemVersion>15.0.0</sparkle:minimumSystemVersion>

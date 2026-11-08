@@ -1,6 +1,16 @@
 # GitHub delivery and signed macOS releases
 
-## Activation status
+## Private distribution migration
+
+On 2026-11-07 the owner selected **public source / private product distribution**. Sterling is the first consumer of the dev-owned, provider-neutral standard recorded in Dev ADR 0018, “Independent repository visibility and distribution.” That standard separates source visibility, distribution audience, effective provider authority and source CI. Shared capability/profile qualification precedes product adoption; Sparkle is one possible macOS updater component, not the umbrella distribution policy.
+
+The existing public binary/feed route is intentionally blocked. The release workflow runs a credential-free distribution preflight before requesting the protected signing environment. Direct `Scripts/release.py` preparation, packaging and publication commands also refuse, including manual retries. There is no flag or environment override to reopen public publication. Local engineering builds and verification remain available.
+
+A private channel, recipient enrollment mechanism and provider have not been selected or activated. Invited-recipient automatic updates remain a required migration outcome. Before the block can be replaced, qualify the shared profile and actual permission boundary, bind Sterling's repository identity and approved audience, replace the public feed/publisher integration, and obtain the existing product/release authorization. Then prove a clean signed installation and a later installed update, including denied/revoked access and integrity failure. A source merge or successful credential diagnostic does not establish those outcomes.
+
+The source CI/App merge process, protected signing environment, signing/integrity requirements and frozen product records continue to govern. Do not merge the owner-controlled release PR, approve a signing deployment or use the old public publishing route to work around the migration. This source containment does not remove previously public assets or recover copies already downloaded.
+
+## Historical activation observations
 
 As verified on 2026-10-30, Sterling is public. Native GitHub Actions with mandatory full-SHA Action pins, the required `ci-required` gate, branch/tag protections, secret scanning and push protection, the protected `release` environment, and all required App/Apple/Sparkle setting names are configured. The installed App successfully approved and squash-merged ordinary [PR #6](https://github.com/KleinPerkins/sterling.io/pull/6) at the verified head; its main CI passed. Release-please successfully created [PR #5](https://github.com/KleinPerkins/sterling.io/pull/5), which remains owner-controlled.
 
@@ -66,23 +76,16 @@ It imports the configured P12 into a temporary keychain, verifies the named Deve
 
 The artifact `credential-readiness` contains only a safe Boolean receipt and commit, not certificates, private keys, passwords, Apple history, or signed probe files. The check does not build or notarize Sterling, create tags/releases, publish assets, or prove installation/update behavior. A green run proves credential readiness only; the release gates below still apply. Failure messages name the stage or setting without exposing values. Correct the relevant encrypted environment setting and rerun; do not remove the environment approval.
 
-## Cutting a release
+## Release status during migration
 
-1. Release-please maintains the version/changelog PR after main updates. Review and manually merge that PR once required CI and product release gates are satisfied. The App does not approve or merge it.
-2. Release-please creates `sterling-vX.Y.Z` and a draft GitHub release, then directly calls the reusable signed-release workflow using the tag string. The tag is created explicitly even for a draft release; no token-generated release event is relied on.
-3. Review the pending `release` environment deployment and approve only the intended tag. This approval starts signing and publishing; merging the infrastructure PR alone does not approve a product release.
-4. The workflow verifies the tag is on main and has passing CI, builds both architectures, imports the P12 into a temporary keychain, signs inside out with hardened runtime, notarizes and staples the app, creates and notarizes the DMG, and signs the update ZIP with the Sterling update key. The keychain and certificate are removed on success or failure.
-5. It uploads `Sterling-X.Y.Z-universal.dmg`, `Sterling-X.Y.Z-universal.zip`, `appcast.xml` and `release-receipt.json`. Draft assets may be replaced on a retry; published assets are never clobbered.
-6. It publishes without changing Latest, downloads the public tag feed/archive, verifies archive length and Ed25519 signature, then promotes Latest and repeats the live-feed check. The previous Latest is restored if that final check fails. Initial publication has no previous release to restore.
+Release-please may continue maintaining its owner-controlled version/changelog PR. Its signed-release invocation and manual dispatches stop at the distribution preflight. Keep release tags immutable and preserve existing draft/release evidence; do not dispatch signing or publication as a migration test. A future qualified private adapter will supply the product-specific procedure and recovery evidence through governed source changes.
 
-Updater endpoint: `https://github.com/KleinPerkins/sterling.io/releases/latest/download/appcast.xml`.
-
-The app exposes manual update checks and opt-in automatic checks. Silent installation is off. Local ad-hoc builds and `--probe` never create the updater. [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution) and [Sparkle update signing](https://sparkle-project.org/documentation/publishing/) are independent requirements.
+The hard-coded GitHub Latest appcast in the dormant implementation is an obsolete public endpoint, not an approved private channel. Local ad-hoc builds and `--probe` never create the updater. Keep opt-in automatic checks and disabled silent installation when integrating the qualified adapter. Apple notarization and update integrity remain independent from recipient access control.
 
 ## Failure and recovery
 
-Before publication, fix the cause and manually dispatch **Signed macOS release** from **main**, using the same existing tag and fresh runner. Do not move the tag or disable checks. The `release` environment requires approval again. A missing configuration message names the missing setting without printing its value.
+The private-distribution migration error is an intentional refusal before signing, packaging or publication. Resolve the qualified shared profile and product integration through reviewed source; do not set an override, remove the preflight or retry the dormant public publisher. The protected `release` environment remains required after migration, and its approval does not replace product release acceptance.
 
-After publication, assets are immutable to this pipeline. If the public smoke check failed, inspect the published assets and receipt; the previous Latest remains or is restored where available. Correct a bad artifact with a new version. For a confirmed transient endpoint problem, the owner may re-verify the existing tag/feed and promote that release manually after the same checks; the workflow deliberately refuses to overwrite it. On a first-release failure, inspect the public release directly because there is no prior Latest to restore.
+Preserve any published version's immutable bytes and release evidence. A defective artifact requires a new version; previously public bytes cannot become retroactively secret. Any deletion, client-route cutover or recipient/provider change needs its scoped transition and recovery decision. Until the replacement is qualified, keep publication blocked and report private delivery as incomplete.
 
-Never lower the required CI check, remove environment approval, reuse a stale review, switch to ad-hoc signing, or silently rotate an updater key to make a release pass. Signing/notarization and update installation need live proof; local tests cannot certify unavailable Apple credentials.
+Never lower required CI, remove environment approval, reuse a stale review, switch distribution to ad-hoc signing or silently rotate an updater key to make a release pass. Signing/notarization and installed updates require their own live evidence.

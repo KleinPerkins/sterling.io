@@ -17,7 +17,23 @@ concurrency:
   group: sterling-release
   cancel-in-progress: false
 jobs:
+  distribution:
+    # Stop before the protected environment or signing credentials are reached.
+    if: github.ref == 'refs/heads/main' && github.repository == 'KleinPerkins/sterling.io'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require qualified private distribution
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: python3 Scripts/release.py distribution-preflight
   release:
+    needs: distribution
     # Environment requires owner approval; manual dispatch must use main.
     if: github.ref == 'refs/heads/main' && github.repository == 'KleinPerkins/sterling.io'
     environment: release

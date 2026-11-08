@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Developer ID + notarization + Sparkle publication. Runs only after release approval."""
+"""Legacy signing/publishing helpers; distribution is paused for private migration."""
 from pathlib import Path
 import base64
 import hashlib
@@ -51,6 +51,15 @@ def version_tuple(tag):
     return tuple(map(int, version_for(tag).split(".")))
 
 
+def distribution_preflight(tag):
+    version_for(tag)
+    # There is no environment override. A reviewed implementation must replace
+    # the legacy public route with a qualified central private delivery profile.
+    raise ValueError("Private distribution migration is pending; signed release preparation, "
+                     "packaging and publication are disabled until the centrally governed "
+                     "private delivery profile is qualified.")
+
+
 def download(url, path):
     request = urllib.request.Request(url, headers={"User-Agent": "Sterling-release-verifier"})
     with urllib.request.urlopen(request, timeout=60) as response, Path(path).open("wb") as output:
@@ -83,6 +92,7 @@ def verify_archive(path, signature, public_key):
 
 
 def prepare(tag):
+    distribution_preflight(tag)
     version = version_for(tag)
     if api("")["private"]: raise ValueError("Public updater publishing requires a public repository")
     revision = run("git", "rev-parse", f"refs/tags/{tag}^{{commit}}").strip()
@@ -121,6 +131,7 @@ def notarize(path, keychain):
 
 
 def package(tag):
+    distribution_preflight(tag)
     version = version_for(tag)
     missing = [key for key in REQUIRED_SECRETS if not os.environ.get(key)]
     if missing: raise ValueError("Missing release configuration: " + ", ".join(missing))
@@ -216,6 +227,7 @@ def public_smoke(tag, directory, public_key, *, latest=False):
 
 
 def publish(tag):
+    distribution_preflight(tag)
     version_for(tag)
     release = api(f"releases/tags/{tag}")
     if not release["draft"]: raise ValueError("Refusing to replace assets of a published release")
@@ -261,7 +273,8 @@ def publish(tag):
 
 if __name__ == "__main__":
     try:
-        command = {"prepare": prepare, "package": package, "publish": publish}[sys.argv[1]]
+        command = {"distribution-preflight": distribution_preflight,
+                   "prepare": prepare, "package": package, "publish": publish}[sys.argv[1]]
         command(os.environ["RELEASE_TAG"])
     except Exception as error:
         print(str(error), file=sys.stderr)
