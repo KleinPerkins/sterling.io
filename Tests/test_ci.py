@@ -152,3 +152,18 @@ class TestShards(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class HostedIdentityTests(unittest.TestCase):
+    def test_aggregate_binds_repository_workflow_and_current_pr_tuple(self):
+        env = {'GITHUB_REPOSITORY': 'KleinPerkins/sterling.io', 'GITHUB_REPOSITORY_ID': '1439196929',
+               'GITHUB_EVENT_NAME': 'pull_request', 'GITHUB_SHA': 'a' * 40, 'GITHUB_WORKFLOW_SHA': 'a' * 40,
+               'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_REF': 'refs/pull/7/merge',
+               'CI_HEAD_SHA': 'b' * 40, 'CI_BASE_SHA': 'c' * 40, 'GITHUB_WORKFLOW': 'CI',
+               'GITHUB_WORKFLOW_REF': 'KleinPerkins/sterling.io/.github/workflows/ci.yml@refs/pull/7/merge'}
+        self.assertEqual(ci.identity(env)['head_sha'], 'b' * 40)
+        for field in env:
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                ci.identity({**env, field: ''})
+        with self.assertRaises(ValueError):
+            ci.identity({**env, 'GITHUB_WORKFLOW_SHA': 'd' * 40})
