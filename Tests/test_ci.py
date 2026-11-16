@@ -150,8 +150,6 @@ class TestShards(unittest.TestCase):
                 ci.aggregate(root, 2, COMMIT, needs)
 
 
-if __name__ == '__main__':
-    unittest.main()
 
 
 class HostedIdentityTests(unittest.TestCase):
@@ -167,3 +165,7 @@ class HostedIdentityTests(unittest.TestCase):
                 ci.identity({**env, field: ''})
         with self.assertRaises(ValueError):
             ci.identity({**env, 'GITHUB_WORKFLOW_SHA': 'd' * 40})
+
+
+if __name__ == '__main__':
+    unittest.main()
