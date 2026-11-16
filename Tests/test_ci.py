@@ -136,7 +136,8 @@ class TestShards(unittest.TestCase):
                 report(xml, item['executed'])
                 item['report_sha256'] = hashlib.sha256(xml.read_bytes()).hexdigest()
                 (directory / 'receipt.json').write_text(json.dumps(item))
-            with patch.object(ci, 'source_digest', return_value='b' * 64):
+            # Fixture receipts are not a real GitHub run, even when tests run in CI.
+            with patch.object(ci, 'source_digest', return_value='b' * 64), patch.dict(ci.os.environ, {'GITHUB_ACTIONS': 'false'}):
                 ci.aggregate(root, 2, COMMIT, needs)
             for result in ('failure', 'skipped', 'cancelled', None, 'unknown'):
                 changed = copy.deepcopy(needs)
