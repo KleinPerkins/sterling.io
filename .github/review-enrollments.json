@@ -123,6 +123,26 @@
         }
       },
       "scope": "Live public schema observation: expectedHeadOid is a supported GitObjectID input for enablePullRequestAutoMerge. It constrains head only; strict required checks and stale approval dismissal arbitrate base races. Schema availability is not proof of a particular merge."
+    },
+    "native_strict_base_contract": {
+      "documentation": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#require-status-checks-to-pass-before-merging",
+      "meaning": "Strict checks require the topic branch itself to be up to date with the base before merge. Rerunning CI alone does not make a behind branch current. Synchronizing a changed base changes the head; stale approval dismissal and the new exact head/base review then apply. The App has no bypass.",
+      "observed_public_canary": {
+        "repository": "KleinPerkins/kp-pr-bot-canary",
+        "pull_request": 104,
+        "at": "2026-11-16T00:49:11Z to 2026-11-16T00:50:11Z",
+        "head": "751398264c2151c090c736ad61097f5f42cec915",
+        "reviewed_base": "a984a598ba77e219ed372797a67908d415b2c1cd",
+        "advanced_main": "83a273faca431275c4c3da868d87a993589f9a6a",
+        "state": "OPEN",
+        "merged": false,
+        "mergeStateStatus": "BEHIND",
+        "reviewDecision": "APPROVED",
+        "check_rollup": "SUCCESS",
+        "auto_merge": "SQUASH, armed by chaos-scheduler-automerge",
+        "other_holds": "resolved before the four observations"
+      },
+      "limits": "Observed post-arming base advancement is reusable evidence, not a claim covering the final-read-to-mutation micro-window, every race interleaving or privileged-owner forgery."
     }
   }
 }
