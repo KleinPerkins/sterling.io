@@ -18,7 +18,7 @@ The `.planning` roadmap retains S0–S4 and expansion from the preserved specifi
 - New phase plans: canonical v2 records with phase views under `.planning/phases/`; approved versions remain immutable.
 - Test growth, exact CI coverage, configurable sharding and performance evidence: [testing runbook](runbooks/testing.md).
 - Builds and exact local verification: `Makefile` and `Scripts/`; native runtime tests require a logged-in Mac desktop.
-- Merge and automation authority: repository `AGENTS.md`, [signed release runbook](runbooks/releasing.md), and the repository-specific public delivery ADR in `docs/adr/`. Private controller policy remains owned by its existing sources.
+- Merge and automation authority: repository `AGENTS.md`, the [delivery and signed release runbook](runbooks/releasing.md), and `.github/review-enrollments.json`. Ordinary source delivery uses independent originating-account review and the Reviewer App; signing and product release remain separately governed.
 
 ## Historical evidence
 
