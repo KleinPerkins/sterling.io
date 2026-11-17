@@ -16,37 +16,6 @@ concurrency:
   group: sterling-app-maintenance
   cancel-in-progress: false
 jobs:
-  approve-and-arm:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.repository == 'KleinPerkins/sterling.io' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      # workflow_run is privileged. Only execute the trusted workflow revision;
-      # never download or execute an artifact or source tree from the PR.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-          sparse-checkout: Scripts
-      - name: Mint reviewer App token
-        id: app
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ secrets.AUTOMERGE_APP_ID }}
-          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-      - name: Approve verified ordinary head and arm native squash auto-merge
-        env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
-          CI_READ_TOKEN: ${{ github.token }}
-          REVIEWER_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
-        run: python3 Scripts/auto-merge.py
   dependencies:
     if: >-
       github.repository == 'KleinPerkins/sterling.io' &&

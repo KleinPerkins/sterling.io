@@ -97,4 +97,6 @@ jobs:
       - name: Require every discovered test exactly once per OS
         env:
           CI_NEEDS_JSON: ${{ toJSON(needs) }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: python3 Scripts/ci.py aggregate --directory work/ci-artifacts --shards '${{ needs.quality.outputs.shards }}'

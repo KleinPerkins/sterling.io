@@ -285,7 +285,8 @@ class DependencyPolicyTests(unittest.TestCase):
                          'python3 Scripts/dependency-maintenance.py', '${{ github.workflow_sha }}',
                          'CI_READ_TOKEN: ${{ github.token }}', 'permission-pull-requests: write'):
             self.assertIn(expected, text)
-        self.assertEqual(text.count('persist-credentials: false'), 2)
+        self.assertEqual(text.count('persist-credentials: false'), 1)
+        self.assertNotIn('python3 Scripts/auto-merge.py', text)
         self.assertNotIn('|| true', text)
         self.assertNotIn('pull_request_target:', text)
         self.assertNotIn('github.actor', text)

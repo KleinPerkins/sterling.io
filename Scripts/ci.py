@@ -16,6 +16,39 @@ PLATFORMS = ('macos-15', 'macos-26')
 MAX_SHARDS = 8
 
 
+def identity_require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def identity(environment: dict[str, str]) -> dict[str, str]:
+    names = ("GITHUB_REPOSITORY", "GITHUB_REPOSITORY_ID", "GITHUB_EVENT_NAME", "GITHUB_SHA",
+             "GITHUB_WORKFLOW_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_REF",
+             "CI_HEAD_SHA", "CI_BASE_SHA", "GITHUB_WORKFLOW_REF", "GITHUB_WORKFLOW")
+    value = {key: environment.get(name, "") for key, name in zip(('repository', 'repository_id', 'event', 'revision', 'workflow_sha', 'run_id', 'run_attempt', 'ref', 'head_sha', 'base_sha', 'workflow_ref', 'workflow'), names)}
+    identity_require(value["repository"] == "KleinPerkins/sterling.io", "wrong repository")
+    identity_require(value["repository_id"] == "1439196929", "wrong immutable repository id")
+    identity_require(value["event"] in {"push", "pull_request", "workflow_dispatch", "schedule"}, "unsupported CI event")
+    for key in ("revision", "workflow_sha"):
+        identity_require(bool(re.fullmatch(r"[0-9a-f]{40}", value[key])), f"invalid {key}")
+    for key in ("run_id", "run_attempt"):
+        identity_require(bool(re.fullmatch(r"[1-9][0-9]*", value[key])), f"invalid {key}")
+    if value["event"] == "pull_request":
+        identity_require(bool(re.fullmatch(r"refs/pull/[1-9][0-9]*/merge", value["ref"])), "expected PR merge ref")
+        for key in ("head_sha", "base_sha"):
+            identity_require(bool(re.fullmatch(r"[0-9a-f]{40}", value[key])), f"invalid {key}")
+    else:
+        identity_require(value["ref"] == "refs/heads/main", "push must target main")
+        identity_require(value["head_sha"] == value["base_sha"] == "", "unexpected PR identity on push")
+    identity_require(value["workflow"] == "CI", "wrong workflow name")
+    identity_require(value["workflow_sha"] == value["revision"], "workflow revision differs from tested source")
+    identity_require(value["workflow_ref"] == "KleinPerkins/sterling.io/.github/workflows/ci.yml@" + value["ref"],
+            "wrong workflow path or ref")
+    return value
+
+
+
+
 def shard_count(value):
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_SHARDS:
         raise ValueError('native_shards must be an integer from 1 to 8')
@@ -181,6 +214,10 @@ def aggregate(directory, count, commit, needs):
     for item in receipts:
         lines.append(f"| {item['platform']} | {item['index'] + 1}/{count} | {len(item['executed'])} | "
                      f"{item['discovery_build_seconds']} | {item['test_seconds']} |")
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        actual = identity(dict(os.environ))
+        identity_require(actual['revision'] == commit, 'aggregate checkout differs from tested revision')
+        print('STERLING_CI_AGGREGATE_V1 ' + json.dumps({'schema': 'sterling.io-ci-aggregate/v1', 'identity': actual, 'result': 'success'}, sort_keys=True, separators=(',', ':')))
     print('\n'.join(lines))
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
