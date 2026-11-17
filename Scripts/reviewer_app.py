@@ -409,11 +409,17 @@ def validate_ci_jobs(api, prefix, pr, merge_sha, run):
         if name == 'ci-required':
             validate_ci_log(api.job_log(job['id']), pr, merge_sha, run)
 
-def snapshot(api, number, policy, policy_hash, now):
+def require_unarmed(pr):
+    require('auto_merge' in pr and pr['auto_merge'] is None,
+            'existing or unknown native auto-merge request; read-only reconciliation required')
+
+
+def snapshot(api, number, policy, policy_hash, now, *, require_successor_only=False):
     prefix = '/repos/' + REPOSITORY
     repo = repository_snapshot(api)
     pr = api.request(prefix + '/pulls/' + str(number))
     require(pr['state'] == 'open' and not pr['draft'] and not pr.get('merged'), 'PR is not open ready')
+    require_unarmed(pr)
     require(pr['user']['id'] == OWNER_ID and pr['user']['type'] == 'User', 'author policy')
     require(pr['head']['repo']['id'] == REPOSITORY_ID and pr['base']['repo']['id'] == REPOSITORY_ID
             and pr['base']['ref'] == 'main', 'fork/base repository mismatch')
@@ -423,7 +429,7 @@ def snapshot(api, number, policy, policy_hash, now):
     rules = api.pages(prefix + '/rules/branches/main')
     summaries = api.pages(prefix + '/rulesets?includes_parents=true')
     rulesets = [api.request(prefix + '/rulesets/' + str(s['id'])) for s in summaries]
-    validate_controls(repo, rules, rulesets)
+    validate_controls(repo, rules, rulesets, require_successor_only=require_successor_only)
     merge_sha = api.request(prefix + f'/git/ref/pull/{number}/merge')['object']['sha']
     merge = api.request(prefix + '/git/commits/' + merge_sha)
     require([p['sha'] for p in merge['parents']] == [base, pr['head']['sha']], 'synthetic merge tuple drift')
@@ -531,24 +537,50 @@ def confirm_native_merge(read_api, number, proof, response):
             'merge_sha': merged_sha, 'base_sha': proof['tuple']['base_sha']}
 
 
+def existing_approval(api, number, head):
+    # GitHub's current review records reconcile a prior successful approval whose
+    # response was lost. Fresh admission below still binds today's complete tuple.
+    rows = api.pages('/repos/' + REPOSITORY + f'/pulls/{number}/reviews')
+    matches = [row for row in rows if row.get('user', {}).get('id') == BOT_ID
+               and row.get('commit_id') == head]
+    if not matches:
+        return None
+    require(len(matches) == 1, 'multiple existing App reviews for this head; read-only reconciliation required')
+    row = matches[0]
+    require(row.get('user', {}).get('login') == APP_SLUG + '[bot]'
+            and row.get('user', {}).get('type') == 'Bot'
+            and type(row.get('id')) is int and row['id'] > 0
+            and row.get('state') == 'APPROVED',
+            'existing App review is not a single current approval; read-only reconciliation required')
+    return {'id': row['id'], 'commit_id': head, 'state': 'APPROVED'}
+
+
 def deliver(read_api, write_api, number, policy, policy_hash, now, app_slug, installation_id):
     require(policy.get('enabled') is True, 'App writes disabled by trusted enrollment policy')
     validate_app_identity(read_api, write_api, app_slug, installation_id)
-    first = snapshot(read_api, number, policy, policy_hash, now)
-    # Re-read all mutable gates immediately before every write. Native strict
-    # required checks and stale-approval dismissal arbitrate races after this read.
-    require(snapshot(read_api, number, policy, policy_hash, now) == first, 'admission drift before approval')
+    first = snapshot(read_api, number, policy, policy_hash, now, require_successor_only=True)
+    # Re-read mutable gates immediately before writes. These observations are not
+    # atomic with approval: the operator accepts the concurrent-writer auto-merge
+    # race documented in trusted policy. Required CI/review gates still apply.
+    require(snapshot(read_api, number, policy, policy_hash, now, require_successor_only=True) == first, 'admission drift before approval')
     head = first['tuple']['head_sha']
-    approval = write_api.request('/repos/' + REPOSITORY + f'/pulls/{number}/reviews', 'POST',
-        {'event': 'APPROVE', 'commit_id': head, 'body': 'G1: completed enrolled local review and current CI/control gates verified. Q16 operational trust applies.'})
-    require(approval['state'] == 'APPROVED' and approval['commit_id'] == head
-            and approval['user']['login'] == app_slug + '[bot]' and approval['user']['id'] == BOT_ID
-            and approval['user']['type'] == 'Bot', 'approval identity/result mismatch')
-    require(snapshot(read_api, number, policy, policy_hash, now) == first, 'admission drift after approval; auto-merge not armed')
+    require_unarmed(read_api.request('/repos/' + REPOSITORY + f'/pulls/{number}'))
+    prior = existing_approval(read_api, number, head)
+    if prior is None:
+        approval = write_api.request('/repos/' + REPOSITORY + f'/pulls/{number}/reviews', 'POST',
+            {'event': 'APPROVE', 'commit_id': head, 'body': 'G1: completed enrolled local review and current CI/control gates verified. Q16 operational trust applies.'})
+        require(approval['state'] == 'APPROVED' and approval['commit_id'] == head
+                and approval['user']['login'] == app_slug + '[bot]' and approval['user']['id'] == BOT_ID
+                and approval['user']['type'] == 'Bot', 'approval identity/result mismatch')
+    require(snapshot(read_api, number, policy, policy_hash, now, require_successor_only=True) == first, 'admission drift after approval; auto-merge not armed')
+    if prior is not None:
+        require(existing_approval(read_api, number, head) == prior,
+                'existing App approval changed; read-only reconciliation required')
     # Select the native operation from a fresh observed state, never from a failed
     # mutation. Like gh --auto, a ready PR uses native merge; a blocked PR is armed.
     prefix = '/repos/' + REPOSITORY
     latest = read_api.request(prefix + f'/pulls/{number}')
+    require_unarmed(latest)
     require(latest.get('node_id') == first['node_id'] and latest.get('state') == 'open'
             and latest.get('merged') is False and latest.get('draft') is False
             and latest.get('head', {}).get('sha') == head
@@ -569,12 +601,25 @@ def deliver(read_api, write_api, number, policy, policy_hash, now, app_slug, ins
         response = mutation_result(result, 'mergePullRequest', 'native squash merge not confirmed')
         return confirm_native_merge(read_api, number, first, response)
     result = write_api.request('/graphql', 'POST', {
-        'query': 'mutation($input:EnablePullRequestAutoMergeInput!){enablePullRequestAutoMerge(input:$input){pullRequest{autoMergeRequest{mergeMethod}}}}',
+        'query': 'mutation($input:EnablePullRequestAutoMergeInput!){enablePullRequestAutoMerge(input:$input){pullRequest{autoMergeRequest{mergeMethod enabledBy{login}}}}}',
         'variables': {'input': inputs}})
     response = mutation_result(result, 'enablePullRequestAutoMerge', 'native auto-merge not confirmed')
     confirmation = response.get('autoMergeRequest')
     require(isinstance(confirmation, dict), 'native auto-merge not confirmed')
-    require(confirmation.get('mergeMethod') == 'SQUASH', 'native auto-merge not confirmed')
+    require(confirmation.get('mergeMethod') == 'SQUASH'
+            and confirmation.get('enabledBy', {}).get('login') == app_slug + '[bot]',
+            'native auto-merge not confirmed')
+    observed = read_api.request(prefix + f'/pulls/{number}')
+    armed = observed.get('auto_merge')
+    require(isinstance(armed, dict) and armed.get('merge_method') == 'squash'
+            and armed.get('enabled_by', {}).get('id') == BOT_ID
+            and armed.get('enabled_by', {}).get('type') == 'Bot'
+            and armed.get('enabled_by', {}).get('login') == app_slug + '[bot]'
+            and observed.get('node_id') == first['node_id'] and observed.get('state') == 'open'
+            and observed.get('merged') is False and observed.get('draft') is False
+            and observed.get('head', {}).get('sha') == head
+            and observed.get('base', {}).get('sha') == first['tuple']['base_sha'],
+            'native auto-merge not confirmed; read-only reconciliation required')
     return {'status': 'armed', 'head_sha': head, 'merged': False}
 
 def main():
