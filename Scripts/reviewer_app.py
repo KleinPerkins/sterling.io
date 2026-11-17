@@ -559,8 +559,9 @@ def deliver(read_api, write_api, number, policy, policy_hash, now, app_slug, ins
     require(policy.get('enabled') is True, 'App writes disabled by trusted enrollment policy')
     validate_app_identity(read_api, write_api, app_slug, installation_id)
     first = snapshot(read_api, number, policy, policy_hash, now, require_successor_only=True)
-    # Re-read all mutable gates immediately before every write. Native strict
-    # required checks and stale-approval dismissal arbitrate races after this read.
+    # Re-read mutable gates immediately before writes. These observations are not
+    # atomic with approval: the operator accepts the concurrent-writer auto-merge
+    # race documented in trusted policy. Required CI/review gates still apply.
     require(snapshot(read_api, number, policy, policy_hash, now, require_successor_only=True) == first, 'admission drift before approval')
     head = first['tuple']['head_sha']
     require_unarmed(read_api.request('/repos/' + REPOSITORY + f'/pulls/{number}'))
