@@ -27,7 +27,7 @@ This repository is born under doc-warden v2 governance.
 
 ## Execution and verification
 
-- Personal source belongs in `~/dev/personal/sterling.io`. Follow the native Codex worktree entry rule, use a unique `DEV_SESSION_ID`, and verify writer ownership before source changes. Native attachment is not AWA registration or protection.
+- Personal source belongs in `~/dev/personal/src/KleinPerkins/sterling.io`. Follow the native Codex worktree entry rule, use a unique `DEV_SESSION_ID`, and verify writer ownership before source changes. Native attachment is not AWA registration or protection.
 - Use LOCAL `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity; do not change global identity or bypass commit guards.
 - `make verify` runs source checks, Swift domain/input tests, and the release app build. It requires macOS; a Linux-only static check cannot stand in for that evidence. `make probe` requires a logged-in desktop and is a separate explicit runtime check.
 - Keep generated app bundles, raw logs, caches and archives ignored. Commit small dated evidence when it changes an acceptance decision, with provenance and limits.
