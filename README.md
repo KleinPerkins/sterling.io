@@ -45,7 +45,7 @@ Generated builds, caches, app bundles, current-run logs and preview archives sta
 
 ## Repository policy
 
-This is `KleinPerkins/sterling.io`, distinct from the existing `KleinPerkins/sterling` project. The canonical personal checkout is `~/dev/personal/sterling.io`; active source work follows the native worktree rule. Use local `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity and the installed session, identity and data guards.
+This is `KleinPerkins/sterling.io`, distinct from the existing `KleinPerkins/sterling` project. The canonical personal checkout is `~/dev/personal/src/KleinPerkins/sterling.io`; active source work follows the native worktree rule. Use local `KleinPerkins <49759187+KleinPerkins@users.noreply.github.com>` identity and the installed session, identity and data guards.
 
 The repository retains doc-warden v2 governance. The owner has selected native GitHub Actions and hosted runners for this public source repository, with App-controlled ordinary PR auto-merge and manual release approval. See [release and setup runbook](docs/runbooks/releasing.md) for activation, signing credentials, required checks and rollback. Workflow files alone do not prove that GitHub settings or credentials are configured. The private SECURITY template is replaced by a reviewed repository-specific policy; the global private baseline is unchanged.
 
